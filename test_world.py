@@ -129,16 +129,19 @@ def check_perk_gating():
     # Even at 100%, one wizard can meet the per-slot recommendation (else full-access fails).
     assert max_rec <= max_single
 
-    # Scripted tutorials are exempt from the PERK gate (they may still require abilities, e.g.
-    # Rushwater Reunion needs Predictive Bolt). Verify: with the mission's required abilities but
-    # ZERO perks/characters, the completion rule still passes -> no perk requirement is imposed.
+    # Scripted tutorials are exempt from the PERK gate (they may still require abilities and
+    # characters, e.g. Rushwater Reunion needs Predictive Bolt + Jen/Zan via HALF_REQUIRED).
+    # Verify: with the mission's required abilities and characters but ZERO perks, the
+    # completion rule still passes -> no perk requirement is imposed.
     for sid in d.SCRIPTED_TUTORIAL_STAGES:
         loc = next(l for l in d.LOCATIONS if l["category"] == "mission_complete" and l["stageID"] == sid)
         rule = rules.make_completion_rule(PLAYER, loc, 50)
         if rule is None:
-            continue  # no requirements at all (e.g. The Asset)
-        ability_items = [d.ABILITY_ITEM_BY_SAVENAME[sv] for sv in d.mission_required_abilities(sid)]
-        assert rule(FakeState(ability_items)), sid  # abilities only, no perks -> perk-gate exempt
+            continue  # no requirements at all
+        items = [d.ABILITY_ITEM_BY_SAVENAME[sv] for sv in
+                 d.mission_required_abilities(sid) + d.mission_half_required_abilities(sid)]
+        items += [d.CHARACTER_ITEM_NAME[c] for c in d.mission_half_required_characters(sid)]
+        assert rule(FakeState(items)), sid  # abilities+chars only, no perks -> perk-gate exempt
     print(f"[ok] perk gating (best-wizard): max per-slot rec {max_rec} <= strongest wizard {max_single}")
 
 
@@ -197,12 +200,20 @@ def check_opening_and_dreams():
     assert d.START_MISSION_STAGE == "Game_Prologue"
     assert d.SECOND_MISSION_STAGE == "Game_Witch_Intro"
     assert d.FIRST_MISSION_COMPLETE_LOCATION == "Complete: The Asset", d.FIRST_MISSION_COMPLETE_LOCATION
-    # The Asset recruits its only required hero (Zan), so it needs nobody -> valid opener.
-    # Rushwater is no longer char-exempt: it needs Zan (Jen, its recruit, is stripped).
+    # NO recruit subtraction (project owner's rule): a mission's own recruit still counts as
+    # a requirement wherever listed. The tutorials' character needs live on their HALFWAY
+    # checks (HALF_REQUIRED): The Asset's halfway needs Zan (its own recruit!), Rushwater's
+    # needs Jen (its own recruit) and Zan.
     assert d.effective_required_characters(d.MISSION_BY_STAGE["Game_Prologue"]) == []
-    assert d.effective_required_characters(d.MISSION_BY_STAGE["Game_Witch_Intro"]) == ["NavySeer"], \
-        d.effective_required_characters(d.MISSION_BY_STAGE["Game_Witch_Intro"])
-    print("[ok] opening: 'The Asset' precollected start (no char req); 'Rushwater Reunion' shuffled, requires Zan")
+    assert d.mission_half_required_characters("Game_Prologue") == ["NavySeer"], \
+        d.mission_half_required_characters("Game_Prologue")
+    assert d.effective_required_characters(d.MISSION_BY_STAGE["Game_Witch_Intro"]) == []
+    assert set(d.mission_half_required_characters("Game_Witch_Intro")) == {"WitchCop", "NavySeer"}, \
+        d.mission_half_required_characters("Game_Witch_Intro")
+    # Proof the recruit is NOT stripped: both tutorials recruit a wizard their half requires.
+    assert "NavySeer" in d.MISSION_BY_STAGE["Game_Prologue"]["recruits"]
+    assert "WitchCop" in d.MISSION_BY_STAGE["Game_Witch_Intro"]["recruits"]
+    print("[ok] opening: no recruit subtraction; tutorials' char needs live on their halfway checks")
 
     expected = {
         "Game_Lucid_Dream_Jen": "WitchCop",
@@ -253,7 +264,8 @@ def check_openers():
             required = data.effective_required_characters(m) + data.mission_half_required_characters(sid)
             assert all(c == hero for c in required), sid
             all_openers.add(m["name"])
-    # The Asset must always qualify (recruit-strips its only required hero, no abilities).
+    # The Asset must always qualify for a Zan start (its only requirement is Zan, the start
+    # hero in that case; no abilities).
     assert "The Asset" in all_openers, sorted(all_openers)
     # The goal mission is never an opener, regardless of hero.
     goal_mission = data.MISSION_BY_STAGE[data.GOAL_STAGE_ID]

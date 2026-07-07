@@ -13,7 +13,7 @@ custom_worlds/
   tactical_breach_wizards.apworld <- the INSTALLED world (a zip of the source below).
                                      This is what Archipelago loads. Never edit it;
                                      rebuild it with build_apworld.py after source edits.
-  _tbw_apworld_dev/             <- this folder. The "_" prefix hides it from Archipelago
+  _tactical_breach_wizards_apworld/             <- this folder. The "_" prefix hides it from Archipelago
                                    (this frozen AP build can only load .apworld zips,
                                    not unpacked folders — verified the hard way).
     tactical_breach_wizards/    <- the world SOURCE you edit
@@ -61,10 +61,11 @@ wardrobe, so the shop stays fully reachable. This makes Confidence Boosts **prog
 
 Loose ordering, not a strict chain. Later acts are gated behind accumulated power
 (number of recruited characters): act 0 free, act 1 needs ≥2 characters, act 2 ≥3,
-act 3 (finale) all 5. Mission regions also enforce per-mission character requirements
-(with the recruitment exception: a mission never requires the wizard it recruits).
-Each **anxiety dream** requires the wizard it's about (e.g. Banks's "Death's Door"
-needs Banks). Missions, halfway checkpoints, and goals can also require specific
+act 3 (finale) all 5. Mission regions also enforce per-mission character requirements —
+**including the mission's own recruit** if listed (no recruit exemption: controlling a
+wizard always means having unlocked them first, even the one that mission would normally
+hand you). Each **anxiety dream** requires the wizard it's about (e.g. Banks's "Death's
+Door" needs Banks). Missions, halfway checkpoints, and goals can also require specific
 **abilities** and extra **heroes** — fill these in as you find them (`FIRM_REQUIRED*`,
 `HALF_REQUIRED*`, `GOAL_REQUIREMENTS` in the mod repo's `tools/generate_ap_data.py`;
 see `HOWTO-add-mission-requirements.md` there). See `rules.py` /

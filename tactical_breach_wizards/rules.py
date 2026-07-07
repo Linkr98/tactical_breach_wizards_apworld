@@ -7,10 +7,11 @@ Logic model (see APWORLD_HANDOFF.md / ap-id-contract memory):
 * **Act-character gate** (currently DISABLED via data.ACT_GATE_ENABLED): when on, late acts
   need an accumulated roster (act 1 >=2 characters, act 2 >=3, act 3 all 5).
 * A **mission region** is reachable when the player has its ``mission_access`` item,
-  satisfies the act gate, and has every character the mission firmly requires (with the
-  recruitment exception applied in data.effective_required_characters).
-* **confidence_goal** locations additionally require the goal's character — unless that
-  character is the mission's own recruit (firm rule) — plus a perk-power gate.
+  satisfies the act gate, and has every character the mission firmly requires — INCLUDING
+  the mission's own recruit if listed (controlling a wizard always means having unlocked
+  them first; see data.effective_required_characters).
+* **confidence_goal** locations additionally require the goal's character (always, even
+  the mission's own recruit) plus a perk-power gate.
 * **outfit_purchase** locations require the outfit's character plus a soft economy gate
   scaling with the confidence cost.
 * **ability_unlock** locations are the reward for the anxiety dream they live in; the dream's
@@ -154,13 +155,12 @@ def make_mission_rule(player: int, mission: Dict):
 
 
 def make_confidence_goal_rule(player: int, loc: Dict, percent: int):
-    """Location rule on top of the mission region: requires the goal's character (unless
-    that character is the mission's own recruit), any extra GOAL_REQUIREMENTS characters/
-    abilities, AND (from Act 2 on) the best unlocked wizard at >= percent% of the mission's
-    recommended per-slot perks."""
+    """Location rule on top of the mission region: requires the goal's character (always --
+    even the mission's own recruit; controlling a wizard means having unlocked them), any
+    extra GOAL_REQUIREMENTS characters/abilities, AND (from Act 2 on) the best unlocked
+    wizard at >= percent% of the mission's recommended per-slot perks."""
     char = loc["character"]
-    mission = data.MISSION_BY_STAGE.get(loc["missionStageID"], {})
-    char_required = char not in mission.get("recruits", [])
+    char_required = True
     extra_chars = loc.get("requiredCharacters", [])
     abilities = loc.get("requiredAbilities", [])
     need = 0

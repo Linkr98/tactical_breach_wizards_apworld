@@ -62,9 +62,7 @@
       ],
       "order": 0,
       "charactersUsed": [],
-      "requiredCharacters": [
-        "NavySeer"
-      ],
+      "requiredCharacters": [],
       "requiredAbilities": [],
       "recruits": [
         "NavySeer"
@@ -77,7 +75,9 @@
       ],
       "lastLevel": "4 The Asset.lvl",
       "halfLevel": "2 Cover.lvl",
-      "halfRequiredCharacters": [],
+      "halfRequiredCharacters": [
+        "NavySeer"
+      ],
       "halfRequiredAbilities": [],
       "recommendedPerks": 0
     },
@@ -91,10 +91,7 @@
       ],
       "order": 1,
       "charactersUsed": [],
-      "requiredCharacters": [
-        "WitchCop",
-        "NavySeer"
-      ],
+      "requiredCharacters": [],
       "requiredAbilities": [
         "seerOverwatch"
       ],
@@ -111,7 +108,10 @@
       ],
       "lastLevel": "6 Back for Banks.lvl",
       "halfLevel": "3 Positions.lvl",
-      "halfRequiredCharacters": [],
+      "halfRequiredCharacters": [
+        "WitchCop",
+        "NavySeer"
+      ],
       "halfRequiredAbilities": [],
       "recommendedPerks": 1
     },
@@ -487,9 +487,7 @@
         "RiotPriest",
         "WitchCop"
       ],
-      "requiredCharacters": [
-        "NecroMedic"
-      ],
+      "requiredCharacters": [],
       "requiredAbilities": [],
       "recruits": [
         "Druid"
@@ -500,7 +498,9 @@
       ],
       "lastLevel": "2 The Other Three Siege Clerics.lvl",
       "halfLevel": "1 The Siege Cleric.lvl",
-      "halfRequiredCharacters": [],
+      "halfRequiredCharacters": [
+        "NecroMedic"
+      ],
       "halfRequiredAbilities": [],
       "recommendedPerks": 5
     },
@@ -594,7 +594,13 @@
       ],
       "lastLevel": "5 Resurrection Race.lvl",
       "halfLevel": "3 The Kill Zone.lvl",
-      "halfRequiredCharacters": [],
+      "halfRequiredCharacters": [
+        "NecroMedic",
+        "NavySeer",
+        "WitchCop",
+        "RiotPriest",
+        "Druid"
+      ],
       "halfRequiredAbilities": [],
       "recommendedPerks": 5
     },
@@ -1818,7 +1824,9 @@
       "act": 0,
       "order": 0,
       "missionStageID": "Game_Prologue",
-      "requiredCharacters": [],
+      "requiredCharacters": [
+        "NavySeer"
+      ],
       "requiredAbilities": []
     },
     {
@@ -1830,7 +1838,10 @@
       "act": 0,
       "order": 1,
       "missionStageID": "Game_Witch_Intro",
-      "requiredCharacters": [],
+      "requiredCharacters": [
+        "WitchCop",
+        "NavySeer"
+      ],
       "requiredAbilities": []
     },
     {
@@ -1962,7 +1973,9 @@
       "act": 2,
       "order": 15,
       "missionStageID": "Game_Siege_Cleric",
-      "requiredCharacters": [],
+      "requiredCharacters": [
+        "NecroMedic"
+      ],
       "requiredAbilities": []
     },
     {
@@ -1974,7 +1987,13 @@
       "act": 2,
       "order": 19,
       "missionStageID": "Game_Lucid_Dream_Banks",
-      "requiredCharacters": [],
+      "requiredCharacters": [
+        "NecroMedic",
+        "NavySeer",
+        "WitchCop",
+        "RiotPriest",
+        "Druid"
+      ],
       "requiredAbilities": []
     },
     {

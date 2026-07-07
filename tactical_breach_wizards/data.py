@@ -204,18 +204,17 @@ for _loc in LOCATIONS:
 def effective_required_characters(mission: Dict) -> List[str]:
     """Characters that must be unlocked to enter a mission's region.
 
-    - The mission's firm ``requiredCharacters`` minus its own ``recruits`` (a recruitment
-      mission must not require the character it recruits -- you get them BY doing it)...
+    - The mission's firm ``requiredCharacters`` -- INCLUDING its own recruit, if listed
+      (project owner's rule: if you control a wizard in a mission, you must have unlocked
+      them first, even the one that mission would normally hand you)...
     - ...plus, for an anxiety dream, the wizard that dream is about.
 
     Scripted tutorials are NOT exempted: they still supply their own cast in-game, but their
     firm requiredCharacters are honoured so the logic never expects a mission before the
-    player holds the heroes it needs (e.g. Rushwater Reunion requires Zan). Their own recruit
-    is still stripped (Rushwater recruits Jen, so it requires only Zan, not Jen).
+    player holds the heroes it needs (e.g. Rushwater Reunion requires Zan).
     """
     sid = mission["stageID"]
-    recruits = set(mission.get("recruits", []))
-    req = [c for c in mission.get("requiredCharacters", []) if c not in recruits]
+    req = list(mission.get("requiredCharacters", []))
     dream = DREAM_REQUIRED_CHARACTER.get(sid)
     if dream and dream not in req:
         req.append(dream)
@@ -266,8 +265,8 @@ def is_valid_opener(mission: Dict, start_hero: str, completion_perk_percent: int
       * The act's character-count gate is satisfiable by the lone start hero (<= 1).
       * Not the goal mission (never start on the win).
       * No required abilities -- completion OR halfway -- the player starts with none.
-      * Required characters (after recruit-strip, plus halfway extras) all satisfied by the
-        single start hero.
+      * Required characters (including the mission's own recruit, plus halfway extras) all
+        satisfied by the single start hero.
       * If the mission's completion is perk-gated (act >= PERK_GATE_MIN_ACT_COMPLETION and a
         percent is given), the head-start power of 1 must satisfy it -- the seed must never
         open on a mission whose own completion check is out of logic.
