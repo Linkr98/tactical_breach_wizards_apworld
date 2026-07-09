@@ -10,7 +10,7 @@ This should only be used if you are testing to help improve this
 ## Required Software
 
 - A copy of **Tactical Breach Wizards** on PC.
-- The **Tactical Breach Wizards Archipelago client mod** (BepInEx + Harmony plugin),
+- The [**Tactical Breach Wizards Archipelago client mod**](https://github.com/Linkr98/Tactical-Breach-Wizards-Archipelago-Mod) (BepInEx + Harmony plugin),
   installed into the game's `BepInEx/plugins` folder.
 - The `tactical_breach_wizards.apworld` file (this world), installed into your
   Archipelago installation.
