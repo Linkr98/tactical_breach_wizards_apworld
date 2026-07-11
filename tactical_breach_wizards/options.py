@@ -23,7 +23,7 @@ class ConfidencePerBoost(Range):
 
 
 class CompletionPerkPercent(Range):
-    """Perk-power gate for completing a mission (from Act 3 on), as a percent of the mission's
+    """Perk-power gate for completing a mission (from Act 2 on), as a percent of the mission's
     recommended PER-SLOT perks (the strongest single wizard the game expects there).
 
     A wizard's perk power = their perk-tree points (always shuffled in as progression) + 1 if

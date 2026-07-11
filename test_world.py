@@ -145,6 +145,47 @@ def check_perk_gating():
     print(f"[ok] perk gating (best-wizard): max per-slot rec {max_rec} <= strongest wizard {max_single}")
 
 
+def check_team_ability_gate():
+    """Goals with requiredTotalAbilities (e.g. 'use 9 abilities in one turn') gate on the
+    team-wide ability count: the room's squadSize best unlocked wizards x (4 - missing
+    BASE-KIT items; dream specials are upgrades and don't count)."""
+    d = data
+    gated = [l for l in d.LOCATIONS
+             if l["category"] == "confidence_goal" and l.get("requiredTotalAbilities")]
+    assert gated, "expected team-ability gated goals (AbilitiesInOneTurnGoal)"
+    # Every gated goal must be satisfiable within ITS OWN room's wizard count.
+    for l in gated:
+        squad = l.get("squadSize") or rules.DEFAULT_SQUAD_SIZE
+        assert l["requiredTotalAbilities"] <= squad * rules.ABILITIES_PER_WIZARD, \
+            (l["name"], l["requiredTotalAbilities"], squad)
+
+    # The gate may need ANY ability item -> every ability must be progression for the fill.
+    ability_cls = {it["classification"] for it in d.ITEMS if it["category"] == "ability"}
+    assert ability_cls == {"progression"}, ability_cls
+
+    # Room-size cap: a 3-wizard room fields at most 12 even with everything collected.
+    all_items = [it["name"] for it in d.ITEMS]
+    assert rules.team_ability_count(FakeState(all_items), PLAYER, 3) == 12
+    assert rules.team_ability_count(FakeState(all_items), PLAYER, 5) == 20
+
+    # Dream specials don't count: dropping every dream ability item changes nothing.
+    no_dreams = [n for n in all_items if n not in set(d.ABILITY_ITEM_FOR_CHARACTER.values())]
+    assert rules.team_ability_count(FakeState(no_dreams), PLAYER, 5) == 20
+
+    # Hardest gate (Fort Osprey 16, a 5-wizard room): passes with everything, fails once
+    # five base-kit items are missing (room total 20 - 5 = 15 < 16).
+    max_need = max(l["requiredTotalAbilities"] for l in gated)
+    hardest = next(l for l in gated if l["requiredTotalAbilities"] == max_need)
+    rule = rules.make_confidence_goal_rule(PLAYER, hardest, 0)  # percent 0 -> pure ability gate
+    assert rule(FakeState(all_items)), "team-ability gate unreachable with all items"
+    base_items = [it for ch in d.PLAYABLE_CHARACTERS
+                  for it in d.BASE_ABILITY_ITEMS_BY_CHARACTER.get(ch, [])]
+    assert not rule(FakeState([n for n in all_items if n not in set(base_items[:5])])), \
+        "gate passed despite 5 missing base-kit abilities"
+    print(f"[ok] team-ability gate: {len(gated)} goals, max need {max_need} "
+          f"(squad {hardest.get('squadSize')}), dream specials excluded")
+
+
 def _mission_reachable(state, mission):
     return rules.make_mission_rule(PLAYER, mission)(state)
 
@@ -281,6 +322,7 @@ def main():
     check_opening_and_dreams()
     check_openers()
     check_perk_gating()
+    check_team_ability_gate()
     check_max_reachability()
     print("\nAll checks passed.")
 

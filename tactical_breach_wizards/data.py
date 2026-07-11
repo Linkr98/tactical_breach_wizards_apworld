@@ -231,11 +231,11 @@ def effective_required_characters(mission: Dict) -> List[str]:
 ACT_GATE_ENABLED = False
 ACT_CHARACTER_GATE: Dict[int, int] = {0: 0, 1: 2, 2: 3, 3: 5}
 
-# Perk-power gating floors (0-indexed acts; act N = the game's "Act N+1"). Confidence goals
-# gate from Act 2 (0-idx 1); completions from Act 3 (0-idx 2). Act 1 stays ungated. They live
+# Perk-power gating floors (0-indexed acts; act N = the game's "Act N+1"). BOTH confidence
+# goals and mission completions gate from Act 2 (0-idx 1) on; Act 1 stays ungated. They live
 # here (not rules.py) so the opener logic can share them; rules.py reads these.
 PERK_GATE_MIN_ACT_GOAL = 1
-PERK_GATE_MIN_ACT_COMPLETION = 2
+PERK_GATE_MIN_ACT_COMPLETION = 1
 
 # The random starting mission is only drawn from acts up to this (0-indexed: 1 = the game's
 # Act 2). This caps how late in the campaign a seed can open INDEPENDENTLY of the act-character

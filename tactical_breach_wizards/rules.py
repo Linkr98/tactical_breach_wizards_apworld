@@ -11,7 +11,8 @@ Logic model (see APWORLD_HANDOFF.md / ap-id-contract memory):
   the mission's own recruit if listed (controlling a wizard always means having unlocked
   them first; see data.effective_required_characters).
 * **confidence_goal** locations additionally require the goal's character (always, even
-  the mission's own recruit) plus a perk-power gate.
+  the mission's own recruit) plus a perk-power gate, and -- for goals that need many
+  abilities at once (``requiredTotalAbilities``) -- a team-wide ability count.
 * **outfit_purchase** locations require the outfit's character plus a soft economy gate
   scaling with the confidence cost.
 * **ability_unlock** locations are the reward for the anxiety dream they live in; the dream's
@@ -32,6 +33,16 @@ PERK_GATE_MIN_ACT_COMPLETION = data.PERK_GATE_MIN_ACT_COMPLETION
 # wizard is CAPPED here so kitless perks aren't worthless (which made generation impossible).
 # e.g. cap 2: a wizard missing all 3 base abilities loses 2, not 3.
 MAX_MISSING_ABILITY_PENALTY = 2
+
+# Team-wide ability gate (requiredTotalAbilities on a confidence goal, e.g. "use 9 abilities
+# in one turn"). A full-kit wizard fields ABILITIES_PER_WIZARD abilities; each BASE-KIT
+# ability item they're still missing removes one. Dream specials do NOT count: they upgrade
+# an existing base ability rather than add a unique one. Only as many wizards as the goal's
+# room actually fields can contribute (the location's squadSize, read from the level's wizard
+# prefabs by the generator; DEFAULT_SQUAD_SIZE when unknown) -- and fielding the same wizard
+# twice adds no new abilities.
+ABILITIES_PER_WIZARD = 4
+DEFAULT_SQUAD_SIZE = 4
 
 
 def character_count(state, player: int) -> int:
@@ -65,6 +76,23 @@ def best_unlocked_perks(state, player: int) -> int:
             if p > best:
                 best = p
     return best
+
+
+def team_ability_count(state, player: int, squad_size: int = DEFAULT_SQUAD_SIZE) -> int:
+    """How many distinct abilities the player's best possible squad for a ``squad_size``-wizard
+    room can field: for each UNLOCKED wizard, ABILITIES_PER_WIZARD minus their still-missing
+    BASE-KIT ability items (dream specials are upgrades, not extra abilities), summed over the
+    best ``squad_size`` wizards."""
+    counts = []
+    for internal in data.PLAYABLE_CHARACTERS:
+        if has_character(state, player, internal):
+            missing = sum(
+                1 for item in data.BASE_ABILITY_ITEMS_BY_CHARACTER.get(internal, [])
+                if not state.has(item, player)
+            )
+            counts.append(max(0, ABILITIES_PER_WIZARD - missing))
+    counts.sort(reverse=True)
+    return sum(counts[:squad_size])
 
 
 def _perk_threshold(recommended: int, percent: int) -> int:
@@ -105,7 +133,7 @@ def make_half_rule(player: int, loc: dict):
 def make_completion_rule(player: int, loc: dict, percent: int):
     """mission_complete gate: needs every ability required to complete the mission, PLUS every
     halfway extra (a mission can only be finished by first reaching its halfway point, so the full
-    completion always assumes the whole restriction set of the half), AND (from Act 3 on) the best
+    completion always assumes the whole restriction set of the half), AND (from Act 2 on) the best
     unlocked wizard at >= percent% of the recommended per-slot perks. Scripted tutorials are exempt
     from the perk gate. Returns None if nothing applies."""
     stage = loc["stageID"]
@@ -157,17 +185,21 @@ def make_mission_rule(player: int, mission: Dict):
 def make_confidence_goal_rule(player: int, loc: Dict, percent: int):
     """Location rule on top of the mission region: requires the goal's character (always --
     even the mission's own recruit; controlling a wizard means having unlocked them), any
-    extra GOAL_REQUIREMENTS characters/abilities, AND (from Act 2 on) the best unlocked
-    wizard at >= percent% of the mission's recommended per-slot perks."""
+    extra GOAL_REQUIREMENTS characters/abilities, a team-wide ability count when the goal
+    needs many abilities at once (``requiredTotalAbilities``, e.g. "use 9 abilities in one
+    turn"), AND (from Act 2 on) the best unlocked wizard at >= percent% of the mission's
+    recommended per-slot perks."""
     char = loc["character"]
     char_required = True
     extra_chars = loc.get("requiredCharacters", [])
     abilities = loc.get("requiredAbilities", [])
+    team_abilities_needed = int(loc.get("requiredTotalAbilities", 0) or 0)
+    squad_size = int(loc.get("squadSize", 0) or 0) or DEFAULT_SQUAD_SIZE
     need = 0
     if loc["missionStageID"] not in data.SCRIPTED_TUTORIAL_STAGES and loc["act"] >= PERK_GATE_MIN_ACT_GOAL:
         need = _perk_threshold(data.recommended_perks_for_stage(loc["missionStageID"]), percent)
 
-    if not char_required and not extra_chars and not abilities and need <= 0:
+    if not char_required and not extra_chars and not abilities and need <= 0 and team_abilities_needed <= 0:
         return None  # region reachability is sufficient
 
     def rule(state) -> bool:
@@ -177,6 +209,8 @@ def make_confidence_goal_rule(player: int, loc: Dict, percent: int):
             if not has_character(state, player, c):
                 return False
         if not has_abilities(state, player, abilities):
+            return False
+        if team_abilities_needed > 0 and team_ability_count(state, player, squad_size) < team_abilities_needed:
             return False
         return best_unlocked_perks(state, player) >= need
 

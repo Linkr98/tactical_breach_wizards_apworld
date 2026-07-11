@@ -19,10 +19,10 @@
 In the Archipelago Launcher, generate a template yaml ("Generate Template Options")
 and edit the **Tactical Breach Wizards** section. Options:
 
-- `completion_perk_percent` — from Act 3 on, completing a mission requires your best wizard
-  to have this percent of its recommended per-slot perks (default 50; 0 disables).
-- `goal_perk_percent` — same idea for confidence goals, from Act 2 on, defaulting higher
-  (default 75; 0 disables). A wizard's perk power counts their perk points + their dream
+- `completion_perk_percent` — from Act 2 on, completing a mission requires your best wizard
+  to have this percent of its recommended per-slot perks (default 25; 0 disables).
+- `goal_perk_percent` — same idea for confidence goals, also from Act 2 on, defaulting higher
+  (default 50; 0 disables). A wizard's perk power counts their perk points + their dream
   ability, and one strong wizard can be fielded in multiple slots, so these check your
   strongest unlocked wizard — keeping you from being underpowered for a late mission.
 - `confidence_per_boost` — how much confidence each "Confidence Boost" item grants
