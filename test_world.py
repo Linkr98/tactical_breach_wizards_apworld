@@ -95,7 +95,7 @@ def check_pool_math():
     base = (
         (sum(1 for it in data.ITEMS if it["category"] == "character") - 1)        # minus start hero
         + (sum(1 for it in data.ITEMS if it["category"] == "mission_access") - 1)  # minus start mission
-        + sum(1 for it in data.ITEMS if it["category"] == "ability")
+        + len(data.ABILITY_ITEM_NAMES)  # live abilities only -- retired ones are never placed
         + (perk_full - 1)  # perk points minus the 1 precollected on the start hero
     )
     fillable = n_locations  # nothing pre-locked; the pool fills every location
@@ -159,8 +159,10 @@ def check_team_ability_gate():
         assert l["requiredTotalAbilities"] <= squad * rules.ABILITIES_PER_WIZARD, \
             (l["name"], l["requiredTotalAbilities"], squad)
 
-    # The gate may need ANY ability item -> every ability must be progression for the fill.
-    ability_cls = {it["classification"] for it in d.ITEMS if it["category"] == "ability"}
+    # The gate may need ANY live ability item -> every one must be progression for the fill.
+    # Retired items (never placed, e.g. the legacy base-kit Death's Floor copy) are exempt.
+    ability_cls = {it["classification"] for it in d.ITEMS
+                   if it["category"] == "ability" and not it.get("retired")}
     assert ability_cls == {"progression"}, ability_cls
 
     # Room-size cap: a 3-wizard room fields at most 12 even with everything collected.
@@ -168,9 +170,17 @@ def check_team_ability_gate():
     assert rules.team_ability_count(FakeState(all_items), PLAYER, 3) == 12
     assert rules.team_ability_count(FakeState(all_items), PLAYER, 5) == 20
 
-    # Dream specials don't count: dropping every dream ability item changes nothing.
-    no_dreams = [n for n in all_items if n not in set(d.ABILITY_ITEM_FOR_CHARACTER.values())]
-    assert rules.team_ability_count(FakeState(no_dreams), PLAYER, 5) == 20
+    # Pure-upgrade dream specials don't count -- but Death's Floor (the merged dream item,
+    # baseKit-flagged) DOES: it's Banks's third fieldable ability, not an upgrade.
+    base_kit_names = {n for items in d.BASE_ABILITY_ITEMS_BY_CHARACTER.values() for n in items}
+    deaths_floor = d.ABILITY_ITEM_FOR_CHARACTER["NecroMedic"]
+    assert deaths_floor in base_kit_names, deaths_floor
+    upgrade_dreams = set(d.ABILITY_ITEM_FOR_CHARACTER.values()) - base_kit_names
+    assert len(upgrade_dreams) == 3, upgrade_dreams
+    no_upgrades = [n for n in all_items if n not in upgrade_dreams]
+    assert rules.team_ability_count(FakeState(no_upgrades), PLAYER, 5) == 20
+    no_floor = [n for n in all_items if n != deaths_floor]
+    assert rules.team_ability_count(FakeState(no_floor), PLAYER, 5) == 19
 
     # Hardest gate (Fort Osprey 16, a 5-wizard room): passes with everything, fails once
     # five base-kit items are missing (room total 20 - 5 = 15 < 16).
@@ -184,6 +194,60 @@ def check_team_ability_gate():
         "gate passed despite 5 missing base-kit abilities"
     print(f"[ok] team-ability gate: {len(gated)} goals, max need {max_need} "
           f"(squad {hardest.get('squadSize')}), dream specials excluded")
+
+
+def check_any_of_gate():
+    """OR-gated requirements (FIRM_REQUIRED_ANY): The Recording's gap needs Dall, OR
+    Banks + Death's Floor, OR Jen + Broom Breach."""
+    d = data
+    sid = "Game_The_Recording"
+    groups = d.mission_required_any(sid)
+    assert len(groups) == 1 and len(groups[0]) == 3, groups
+    loc = next(l for l in d.LOCATIONS if l["category"] == "mission_complete" and l["stageID"] == sid)
+    rule = rules.make_completion_rule(PLAYER, loc, 0)  # percent 0 -> pure OR-gate, no perk need
+    assert rule is not None
+
+    dall = d.CHARACTER_ITEM_NAME["RiotPriest"]
+    banks = d.CHARACTER_ITEM_NAME["NecroMedic"]
+    jen = d.CHARACTER_ITEM_NAME["WitchCop"]
+    floor = d.ABILITY_ITEM_BY_SAVENAME["Unlock_DeathsFloor"]
+    broom = d.ABILITY_ITEM_BY_SAVENAME["UnlockBroomBreach"]
+
+    assert not rule(FakeState([]))                       # nothing -> no way across
+    assert rule(FakeState([dall]))                       # Dall alone suffices
+    assert not rule(FakeState([banks]))                  # Banks without Death's Floor: no
+    assert rule(FakeState([banks, floor]))               # Banks + Death's Floor
+    assert not rule(FakeState([jen]))                    # Jen without Broom Breach: no
+    assert rule(FakeState([jen, broom]))                 # Jen + Broom Breach
+    assert not rule(FakeState([floor, broom]))           # abilities without their wizard: no
+    # Anyone else entirely -- e.g. Zan + Rion with full kits -- still can't cross.
+    others = [d.CHARACTER_ITEM_NAME["NavySeer"], d.CHARACTER_ITEM_NAME["Druid"]]
+    others += d.BASE_ABILITY_ITEMS_BY_CHARACTER["NavySeer"] + d.BASE_ABILITY_ITEMS_BY_CHARACTER["Druid"]
+    assert not rule(FakeState(others))
+    print("[ok] OR-gate: The Recording needs Dall | Banks+Death's Floor | Jen+Broom Breach")
+
+
+def check_retired_items():
+    """Retired items (merged duplicates) keep their frozen id but are invisible to logic:
+    the base-kit Death's Floor copy stays defined for old seeds, while the dream item is
+    THE Death's Floor -- friendly name, Banks's kit, one item players ever see."""
+    d = data
+    retired = [it for it in d.ITEMS if it.get("retired")]
+    assert [it["key"] for it in retired] == ["ability:UnlockDeathsFloor"], retired
+    it = retired[0]
+    assert it["id"] == 271829312, it  # frozen id -- old seeds may still send it
+    # Excluded from every live lookup: pool names, savename map, victory capstone, base kits.
+    assert it["name"] not in d.ABILITY_ITEM_NAMES
+    assert "UnlockDeathsFloor" not in d.ABILITY_ITEM_BY_SAVENAME
+    assert it["name"] not in d.GOAL_REQUIRED_ITEM_NAMES
+    assert all(it["name"] not in items for items in d.BASE_ABILITY_ITEMS_BY_CHARACTER.values())
+    # The dream item took over: friendly name, in Banks's base kit, and the victory capstone.
+    live = d.ABILITY_ITEM_BY_SAVENAME["Unlock_DeathsFloor"]
+    assert live == "Ability: Death's Floor (Banks)", live
+    assert live in d.BASE_ABILITY_ITEMS_BY_CHARACTER["NecroMedic"]
+    assert live in d.GOAL_REQUIRED_ITEM_NAMES
+    assert len(d.ABILITY_ITEM_NAMES) == 13, len(d.ABILITY_ITEM_NAMES)  # 14 defined - 1 retired
+    print("[ok] retired items: legacy Death's Floor defined-but-unplaced; dream item is THE item")
 
 
 def _mission_reachable(state, mission):
@@ -242,19 +306,21 @@ def check_opening_and_dreams():
     assert d.SECOND_MISSION_STAGE == "Game_Witch_Intro"
     assert d.FIRST_MISSION_COMPLETE_LOCATION == "Complete: The Asset", d.FIRST_MISSION_COMPLETE_LOCATION
     # NO recruit subtraction (project owner's rule): a mission's own recruit still counts as
-    # a requirement wherever listed. The tutorials' character needs live on their HALFWAY
-    # checks (HALF_REQUIRED): The Asset's halfway needs Zan (its own recruit!), Rushwater's
-    # needs Jen (its own recruit) and Zan.
-    assert d.effective_required_characters(d.MISSION_BY_STAGE["Game_Prologue"]) == []
+    # a requirement wherever listed. The tutorials AUTO-FIELD their casts and the mod refuses
+    # to launch them without those wizards (AUTO_GIVEN_CHARACTERS, folded into the contract's
+    # requiredCharacters), so their character needs are REGION requirements: The Asset needs
+    # Zan (its own recruit!) to even enter; Rushwater needs Jen (its own recruit) and Zan.
+    assert d.effective_required_characters(d.MISSION_BY_STAGE["Game_Prologue"]) == ["NavySeer"], \
+        d.effective_required_characters(d.MISSION_BY_STAGE["Game_Prologue"])
+    assert set(d.effective_required_characters(d.MISSION_BY_STAGE["Game_Witch_Intro"])) == {"WitchCop", "NavySeer"}, \
+        d.effective_required_characters(d.MISSION_BY_STAGE["Game_Witch_Intro"])
+    # Halfway extras still carried (harmless duplication of the region gate for tutorials).
     assert d.mission_half_required_characters("Game_Prologue") == ["NavySeer"], \
         d.mission_half_required_characters("Game_Prologue")
-    assert d.effective_required_characters(d.MISSION_BY_STAGE["Game_Witch_Intro"]) == []
-    assert set(d.mission_half_required_characters("Game_Witch_Intro")) == {"WitchCop", "NavySeer"}, \
-        d.mission_half_required_characters("Game_Witch_Intro")
-    # Proof the recruit is NOT stripped: both tutorials recruit a wizard their half requires.
+    # Proof the recruit is NOT stripped: both tutorials recruit a wizard their region requires.
     assert "NavySeer" in d.MISSION_BY_STAGE["Game_Prologue"]["recruits"]
     assert "WitchCop" in d.MISSION_BY_STAGE["Game_Witch_Intro"]["recruits"]
-    print("[ok] opening: no recruit subtraction; tutorials' char needs live on their halfway checks")
+    print("[ok] opening: no recruit subtraction; tutorials' auto-given casts gate their regions")
 
     expected = {
         "Game_Lucid_Dream_Jen": "WitchCop",
@@ -304,6 +370,10 @@ def check_openers():
             assert not data.mission_half_required_abilities(sid), sid
             required = data.effective_required_characters(m) + data.mission_half_required_characters(sid)
             assert all(c == hero for c in required), sid
+            # OR-gates: every group must have an ability-free alternative the lone hero meets.
+            for group in data.mission_required_any(sid) + data.mission_half_required_any(sid):
+                assert any(not alt["abilities"] and all(c == hero for c in alt["characters"])
+                           for alt in group), (sid, hero)
             all_openers.add(m["name"])
     # The Asset must always qualify for a Zan start (its only requirement is Zan, the start
     # hero in that case; no abilities).
@@ -323,6 +393,8 @@ def main():
     check_openers()
     check_perk_gating()
     check_team_ability_gate()
+    check_any_of_gate()
+    check_retired_items()
     check_max_reachability()
     print("\nAll checks passed.")
 

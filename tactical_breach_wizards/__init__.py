@@ -46,7 +46,9 @@ class TBWLocation(Location):
 def _build_item_name_groups() -> Dict[str, List[str]]:
     groups: Dict[str, List[str]] = {}
     by_category: Dict[str, List[str]] = {}
-    for it in data.ITEMS:
+    # Retired items (never placed; kept only for id stability) stay out of every group.
+    live_items = [it for it in data.ITEMS if not it.get("retired")]
+    for it in live_items:
         by_category.setdefault(it["category"], []).append(it["name"])
     groups["Characters"] = by_category.get("character", [])
     groups["Mission Access"] = by_category.get("mission_access", [])
@@ -54,7 +56,7 @@ def _build_item_name_groups() -> Dict[str, List[str]]:
     groups["Perk Points"] = by_category.get("perk_point", [])
     groups["Outfits"] = by_category.get("outfit", [])
     # Per-character convenience groups (e.g. "Zan" -> all of Zan's items).
-    for it in data.ITEMS:
+    for it in live_items:
         internal = it.get("internal") or it.get("character")
         if internal in data.NAME_MAP:
             groups.setdefault(data.NAME_MAP[internal], []).append(it["name"])
@@ -143,6 +145,17 @@ class TBWWorld(World):
         # gates through. Other wizards still start kitless and must earn their kit to count.
         for base_item in data.BASE_ABILITY_ITEMS_BY_CHARACTER.get(self.start_hero, []):
             self.multiworld.push_precollected(self.create_item(base_item))
+        # Widen the opening for the FILL: force two more valid-opener mission accesses into
+        # the earliest reachable checks (AP early_items). A single-room opener can make
+        # sphere 0 exactly ONE location (its Complete check); threading ~180 progression
+        # items through that 1-wide bottleneck made ~15% of real generations FillError
+        # (repro: seeds 3/4 with any knobs). The items still shuffle -- only their sphere
+        # is pinned early -- and the player experience is "your first checks open more
+        # missions", which is the pacing the fill needed anyway.
+        extra_openers = [m for m in openers if m["stageID"] != self.start_mission]
+        self.random.shuffle(extra_openers)
+        for m in extra_openers[:2]:
+            self.multiworld.early_items[self.player][data.MISSION_ITEM_NAME[m["stageID"]]] = 1
 
     def create_items(self) -> None:
         pool: List[Item] = []
@@ -159,6 +172,8 @@ class TBWWorld(World):
                     continue  # precollected
                 pool.append(self.create_item(it["name"]))
             elif cat == "ability":
+                if it.get("retired"):
+                    continue  # defined for id stability only; never placed
                 if it.get("baseKit") and it.get("character") == self.start_hero:
                     continue  # precollected as the start hero's kit
                 pool.append(self.create_item(it["name"]))
@@ -241,15 +256,38 @@ class TBWWorld(World):
                     location.access_rule = rule
             elif cat == "outfit_purchase":
                 location.access_rule = rules.make_outfit_rule(player, loc, k)
-            # recruit, ability_unlock: region reachability is sufficient
-            # (ability_unlock lives in its dream's region, which already requires that dream's
-            #  mission access + the dream's wizard + the act gate)
+            elif cat == "ability_unlock":
+                # Fires exactly when its dream's mission-complete check fires (the mod reports
+                # it on completion), so it must carry the SAME rule as that completion location
+                # -- completion/halfway abilities and the perk gate -- on top of the shared
+                # region rule. Region reachability alone made e.g. Unlock: Unlock_DeathsFloor
+                # look reachable when the dream itself couldn't be finished.
+                comp_loc = data.LOCATION_BY_KEY.get("mission:" + str(loc.get("missionStageID")))
+                if comp_loc is not None:
+                    rule = rules.make_completion_rule(player, comp_loc, completion_pct)
+                    if rule is not None:
+                        location.access_rule = rule
+            elif cat == "recruit":
+                # Recruits also fire on their mission's COMPLETION (the mod reports them from
+                # ReportMissionComplete), so they carry the same rule as that completion check
+                # -- e.g. Recruit: Rion demands actually being able to BEAT The Siege Cleric
+                # (Banks for the resurrect objective, perk gate), not merely enter it.
+                comp_loc = data.LOCATION_BY_KEY.get("mission:" + str(loc.get("stageID")))
+                if comp_loc is not None:
+                    rule = rules.make_completion_rule(player, comp_loc, completion_pct)
+                    if rule is not None:
+                        location.access_rule = rule
 
             region.locations.append(location)
 
     def set_rules(self) -> None:
+        # Victory = finish the finale AND (per the contract's goal flags) hold the full
+        # roster + every ability item. The extras live ONLY here on the completion
+        # condition; location/region rules stay untouched so the fill is unconstrained.
+        extra_items = tuple(data.GOAL_REQUIRED_ITEM_NAMES)
         self.multiworld.completion_condition[self.player] = (
             lambda state: state.can_reach_location(data.GOAL_LOCATION_NAME, self.player)
+            and state.has_all(extra_items, self.player)
         )
 
     # ------------------------------------------------------------- slot data

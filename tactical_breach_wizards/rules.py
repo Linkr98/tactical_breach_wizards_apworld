@@ -109,6 +109,20 @@ def has_abilities(state, player: int, savenames) -> bool:
     return True
 
 
+def satisfies_any_groups(state, player: int, groups) -> bool:
+    """OR-gates (requiredAnyOf / halfRequiredAnyOf): ``groups`` is a list of groups, each a
+    list of {"characters": [...], "abilities": [...]} alternatives. Every group must have at
+    least one alternative whose characters AND abilities are all held. Vacuously true for []."""
+    for group in groups:
+        if not any(
+            all(has_character(state, player, c) for c in alt.get("characters", []))
+            and has_abilities(state, player, alt.get("abilities", []))
+            for alt in group
+        ):
+            return False
+    return True
+
+
 def make_half_rule(player: int, loc: dict):
     """mission_half gate: the halfway checkpoint of a multi-room mission. It lives in the
     mission's region (so it already inherits mission access + the act gate + the mission's firm
@@ -118,14 +132,16 @@ def make_half_rule(player: int, loc: dict):
     is then sufficient)."""
     extra_chars = loc.get("requiredCharacters", [])
     abilities = loc.get("requiredAbilities", [])
-    if not extra_chars and not abilities:
+    any_groups = loc.get("requiredAnyOf", [])
+    if not extra_chars and not abilities and not any_groups:
         return None
 
     def rule(state) -> bool:
         for c in extra_chars:
             if not has_character(state, player, c):
                 return False
-        return has_abilities(state, player, abilities)
+        return (has_abilities(state, player, abilities)
+                and satisfies_any_groups(state, player, any_groups))
 
     return rule
 
@@ -133,18 +149,20 @@ def make_half_rule(player: int, loc: dict):
 def make_completion_rule(player: int, loc: dict, percent: int):
     """mission_complete gate: needs every ability required to complete the mission, PLUS every
     halfway extra (a mission can only be finished by first reaching its halfway point, so the full
-    completion always assumes the whole restriction set of the half), AND (from Act 2 on) the best
-    unlocked wizard at >= percent% of the recommended per-slot perks. Scripted tutorials are exempt
-    from the perk gate. Returns None if nothing applies."""
+    completion always assumes the whole restriction set of the half), AND the best unlocked wizard
+    at >= percent% of the recommended per-slot perks (every act, from PERK_GATE_MIN_ACT_COMPLETION
+    on). Scripted tutorials are exempt from the perk gate. Returns None if nothing applies."""
     stage = loc["stageID"]
     # Union the completion abilities with the halfway abilities (full >= half).
     abilities = list(dict.fromkeys(
         data.mission_required_abilities(stage) + data.mission_half_required_abilities(stage)))
     half_chars = data.mission_half_required_characters(stage)
+    # OR-gates likewise: the completion's own groups plus the halfway's (full >= half).
+    any_groups = data.mission_required_any(stage) + data.mission_half_required_any(stage)
     perk_need = 0
     if stage not in data.SCRIPTED_TUTORIAL_STAGES and loc["act"] >= PERK_GATE_MIN_ACT_COMPLETION:
         perk_need = _perk_threshold(data.recommended_perks_for_stage(stage), percent)
-    if not abilities and not half_chars and perk_need <= 0:
+    if not abilities and not half_chars and not any_groups and perk_need <= 0:
         return None
 
     def rule(state) -> bool:
@@ -153,6 +171,8 @@ def make_completion_rule(player: int, loc: dict, percent: int):
         for c in half_chars:
             if not has_character(state, player, c):
                 return False
+        if not satisfies_any_groups(state, player, any_groups):
+            return False
         return best_unlocked_perks(state, player) >= perk_need
 
     return rule
@@ -187,8 +207,8 @@ def make_confidence_goal_rule(player: int, loc: Dict, percent: int):
     even the mission's own recruit; controlling a wizard means having unlocked them), any
     extra GOAL_REQUIREMENTS characters/abilities, a team-wide ability count when the goal
     needs many abilities at once (``requiredTotalAbilities``, e.g. "use 9 abilities in one
-    turn"), AND (from Act 2 on) the best unlocked wizard at >= percent% of the mission's
-    recommended per-slot perks."""
+    turn"), AND the best unlocked wizard at >= percent% of the mission's recommended
+    per-slot perks (every act, from PERK_GATE_MIN_ACT_GOAL on)."""
     char = loc["character"]
     char_required = True
     extra_chars = loc.get("requiredCharacters", [])

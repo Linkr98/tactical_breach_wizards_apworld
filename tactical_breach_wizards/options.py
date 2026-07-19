@@ -29,22 +29,25 @@ class CompletionPerkPercent(Range):
     A wizard's perk power = their perk-tree points (always shuffled in as progression) + 1 if
     their dream ability is unlocked. Because you can field one wizard in multiple slots, the
     check is against your BEST unlocked wizard -- so you can't clear a too-hard late mission
-    without at least one suitably strong wizard. 0 disables the gate.
+    without at least one suitably strong wizard.
+    note: 70 and above will start causing fill issues sometimes.
     """
     display_name = "Completion Perk %"
-    range_start = 0
+    range_start = 20
     range_end = 100
-    default = 25
+    default = 40
 
 
 class GoalPerkPercent(Range):
     """Perk-power gate for a mission's confidence goals (from Act 2 on), as a percent of the
     mission's recommended per-slot perks, checked against your best unlocked wizard. Confidence
-    goals are harder than just clearing the mission, so this defaults higher. 0 disables it."""
+    goals are harder than just clearing the mission, so this defaults higher. 0 disables it.
+    note: lower numbers may be impossible
+    """
     display_name = "Confidence Goal Perk %"
-    range_start = 0
+    range_start = 60
     range_end = 100
-    default = 50
+    default = 70
 
 
 @dataclass

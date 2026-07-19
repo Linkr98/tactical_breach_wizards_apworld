@@ -52,6 +52,7 @@ location_name_to_id: Dict[str, int] = {loc["name"]: loc["id"] for loc in LOCATIO
 
 ITEM_BY_NAME: Dict[str, Dict] = {it["name"]: it for it in ITEMS}
 LOCATION_BY_NAME: Dict[str, Dict] = {loc["name"]: loc for loc in LOCATIONS}
+LOCATION_BY_KEY: Dict[str, Dict] = {loc["key"]: loc for loc in LOCATIONS}
 MISSION_BY_STAGE: Dict[str, Dict] = {m["stageID"]: m for m in MISSIONS}
 
 # ---------------------------------------------------------------------------
@@ -79,12 +80,18 @@ for _it in ITEMS:
 
 CHARACTER_ITEM_NAMES: List[str] = [CHARACTER_ITEM_NAME[c] for c in PLAYABLE_CHARACTERS]
 PERK_ITEM_NAMES: List[str] = [it["name"] for it in ITEMS if it["category"] == "perk_point"]
-# All ability item names (4 PerkUnlock "dream" specials + 10 base-kit abilities).
-ABILITY_ITEM_NAMES: List[str] = [it["name"] for it in ITEMS if it["category"] == "ability"]
+# All LIVE ability item names (4 PerkUnlock "dream" specials + 9 base-kit abilities).
+# RETIRED items (duplicate grants, e.g. the base-kit Death's Floor copy) stay defined in
+# ITEMS so their frozen ids survive for old seeds, but are excluded from the pool, from the
+# victory capstone, and from every logic lookup below.
+ABILITY_ITEM_NAMES: List[str] = [
+    it["name"] for it in ITEMS if it["category"] == "ability" and not it.get("retired")
+]
 # Ability savename (part after "ability:" in the key) -> item name. Lets mission/goal
 # requirements reference abilities by savename (e.g. "UnlockFalseProphet", "Unlock_ChainShockSuperchain").
 ABILITY_ITEM_BY_SAVENAME: Dict[str, str] = {
-    it["key"].split(":", 1)[1]: it["name"] for it in ITEMS if it["category"] == "ability"
+    it["key"].split(":", 1)[1]: it["name"]
+    for it in ITEMS if it["category"] == "ability" and not it.get("retired")
 }
 
 
@@ -106,6 +113,21 @@ def mission_half_required_characters(stage_id: str) -> List[str]:
     Also folded into the full completion."""
     m = MISSION_BY_STAGE.get(stage_id)
     return list(m.get("halfRequiredCharacters", [])) if m else []
+
+
+def mission_required_any(stage_id: str) -> List[List[Dict]]:
+    """OR-gates on a mission's COMPLETION: a list of groups, each a list of
+    {"characters": [...], "abilities": [...]} alternatives. Every group must have at
+    least one alternative fully satisfied (empty if none)."""
+    m = MISSION_BY_STAGE.get(stage_id)
+    return list(m.get("requiredAnyOf", [])) if m else []
+
+
+def mission_half_required_any(stage_id: str) -> List[List[Dict]]:
+    """OR-gates on a mission's HALFWAY checkpoint, same shape as mission_required_any.
+    Also folded into the full completion (full mission >= half mission)."""
+    m = MISSION_BY_STAGE.get(stage_id)
+    return list(m.get("halfRequiredAnyOf", [])) if m else []
 
 
 # Base-kit ability item names per wizard. Each one a wizard is MISSING counts as -1 to their
@@ -165,6 +187,16 @@ GOAL_LOCATION_KEY: str = GOAL["locationKey"]            # "mission:Game_Finale_R
 GOAL_LOCATION_NAME: str = next(
     loc["name"] for loc in LOCATIONS if loc["key"] == GOAL_LOCATION_KEY
 )
+
+# Victory-condition extras (contract "goal" flags): item NAMES the player must hold to WIN,
+# on top of reaching the goal location. Applied to completion_condition ONLY -- never to
+# location/region access rules, so the fill is completely unconstrained by them (folding
+# them into the Roof mission's requirements made ~1 in 6 fills deadlock).
+GOAL_REQUIRED_ITEM_NAMES: List[str] = []
+if GOAL.get("requireAllCharacters"):
+    GOAL_REQUIRED_ITEM_NAMES += [it["name"] for it in ITEMS if it["category"] == "character"]
+if GOAL.get("requireAllAbilities"):
+    GOAL_REQUIRED_ITEM_NAMES += list(ABILITY_ITEM_NAMES)  # live abilities only, never retired
 
 
 # Opening. Only the start CHARACTER + start MISSION (The Asset) are precollected; the player
@@ -232,10 +264,13 @@ ACT_GATE_ENABLED = False
 ACT_CHARACTER_GATE: Dict[int, int] = {0: 0, 1: 2, 2: 3, 3: 5}
 
 # Perk-power gating floors (0-indexed acts; act N = the game's "Act N+1"). BOTH confidence
-# goals and mission completions gate from Act 2 (0-idx 1) on; Act 1 stays ungated. They live
-# here (not rules.py) so the opener logic can share them; rules.py reads these.
-PERK_GATE_MIN_ACT_GOAL = 1
-PERK_GATE_MIN_ACT_COMPLETION = 1
+# goals and mission completions gate from Act 1 (0-idx 0) on -- i.e. every act (project owner,
+# 2026-07-12; Act 1 was previously ungated). Act-1 recommendations are low (rec 0-1) so at the
+# default percents the start head-start (1 perk point on a full-kit wizard) still satisfies
+# them. Scripted tutorials stay exempt. They live here (not rules.py) so the opener logic can
+# share them; rules.py reads these.
+PERK_GATE_MIN_ACT_GOAL = 0
+PERK_GATE_MIN_ACT_COMPLETION = 0
 
 # The random starting mission is only drawn from acts up to this (0-indexed: 1 = the game's
 # Act 2). This caps how late in the campaign a seed can open INDEPENDENTLY of the act-character
@@ -288,6 +323,14 @@ def is_valid_opener(mission: Dict, start_hero: str, completion_perk_percent: int
     required = effective_required_characters(mission) + mission_half_required_characters(sid)
     if not all(c == start_hero for c in required):
         return False
+    # OR-gates: every group must have an alternative the lone start hero satisfies with
+    # NO abilities -- conservative like the required-abilities check above (the start hero
+    # does get their own base kit precollected, but openers deliberately never count on it).
+    for group in mission_required_any(sid) + mission_half_required_any(sid):
+        if not any(not alt.get("abilities")
+                   and all(c == start_hero for c in alt.get("characters", []))
+                   for alt in group):
+            return False
     if completion_perk_percent and act >= PERK_GATE_MIN_ACT_COMPLETION:
         rec = recommended_perks_for_stage(sid)
         need = -(-(rec * completion_perk_percent) // 100)  # ceil
