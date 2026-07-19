@@ -1,11 +1,12 @@
 # Tactical Breach Wizards Multiworld Setup Guide
 
-## WORK IN PROGRESS!!! LOGIC is NOT FINISHED
+## Beta
 
-Slots are likely to not be beatable because man missions and confidence goals currently don't have any logic if they require specific characters or abilities
+Logic is currently work in progress. There is a chance that there are unreachable locations in logic and because of that it is possible to get an impossible seed. Using /send_location or 'Skip Level' may be require if you soft lock.
 
-This should only be used if you are testing to help improve this
+Defaults for `completion_perk_percent`and `goal_perk_percent` have not been fully balanced setting them to high or to low may result generation failures or impossible seeds.
 
+If you have a better filler item name then Donut please let me know.
 
 ## Required Software
 
@@ -68,10 +69,12 @@ Complete the campaign finale, **"Counterheist: The Roof"**.
 ## Notes
 
 - This will not save a save game to your saves list
-- Where you spend perk points isn't saved when you exit the game. 
-	- Returning to the main menu will let you reset perk point choices. This may be required to beat some levels.
-- Once you finish an entire mission you can access each room individually as normal
+- Upon getting the halfway or mission completion check for every level you will be able to do level select for relacent levels
 - Pressing START without selecting your characters will use the defaults which you may not have unlock so just use Esc->Restart Level
 - Incoming Deathlinks are granted on the start of your next turn
 - Outgoing Deathlinks are sent if one of your wizards is dead when you press End Turn that was alive during your turn.
+
+## AI Disclosure
+
+Claude was used in the making of most of both the mod and the AP world but I have been testing and tweaking logic myself.
 
