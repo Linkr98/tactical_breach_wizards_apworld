@@ -170,17 +170,10 @@ def check_team_ability_gate():
     assert rules.team_ability_count(FakeState(all_items), PLAYER, 3) == 12
     assert rules.team_ability_count(FakeState(all_items), PLAYER, 5) == 20
 
-    # Pure-upgrade dream specials don't count -- but Death's Floor (the merged dream item,
-    # baseKit-flagged) DOES: it's Banks's third fieldable ability, not an upgrade.
-    base_kit_names = {n for items in d.BASE_ABILITY_ITEMS_BY_CHARACTER.values() for n in items}
-    deaths_floor = d.ABILITY_ITEM_FOR_CHARACTER["NecroMedic"]
-    assert deaths_floor in base_kit_names, deaths_floor
-    upgrade_dreams = set(d.ABILITY_ITEM_FOR_CHARACTER.values()) - base_kit_names
-    assert len(upgrade_dreams) == 3, upgrade_dreams
-    no_upgrades = [n for n in all_items if n not in upgrade_dreams]
-    assert rules.team_ability_count(FakeState(no_upgrades), PLAYER, 5) == 20
-    no_floor = [n for n in all_items if n != deaths_floor]
-    assert rules.team_ability_count(FakeState(no_floor), PLAYER, 5) == 19
+    # Dream specials don't count (all four, incl. Death's Floor -- a pure dream reward,
+    # NOT part of Banks's base kit): dropping every dream ability item changes nothing.
+    no_dreams = [n for n in all_items if n not in set(d.ABILITY_ITEM_FOR_CHARACTER.values())]
+    assert rules.team_ability_count(FakeState(no_dreams), PLAYER, 5) == 20
 
     # Hardest gate (Fort Osprey 16, a 5-wizard room): passes with everything, fails once
     # five base-kit items are missing (room total 20 - 5 = 15 < 16).
@@ -241,10 +234,13 @@ def check_retired_items():
     assert "UnlockDeathsFloor" not in d.ABILITY_ITEM_BY_SAVENAME
     assert it["name"] not in d.GOAL_REQUIRED_ITEM_NAMES
     assert all(it["name"] not in items for items in d.BASE_ABILITY_ITEMS_BY_CHARACTER.values())
-    # The dream item took over: friendly name, in Banks's base kit, and the victory capstone.
+    # The dream item took over the friendly name and the victory capstone, but stays a pure
+    # dream reward: NOT in Banks's base kit (her kit is Spectral Skull + Transference).
     live = d.ABILITY_ITEM_BY_SAVENAME["Unlock_DeathsFloor"]
     assert live == "Ability: Death's Floor (Banks)", live
-    assert live in d.BASE_ABILITY_ITEMS_BY_CHARACTER["NecroMedic"]
+    assert live not in d.BASE_ABILITY_ITEMS_BY_CHARACTER["NecroMedic"]
+    assert len(d.BASE_ABILITY_ITEMS_BY_CHARACTER["NecroMedic"]) == 2
+    assert live == d.ABILITY_ITEM_FOR_CHARACTER["NecroMedic"]  # her dream reward (+1 perk)
     assert live in d.GOAL_REQUIRED_ITEM_NAMES
     assert len(d.ABILITY_ITEM_NAMES) == 13, len(d.ABILITY_ITEM_NAMES)  # 14 defined - 1 retired
     print("[ok] retired items: legacy Death's Floor defined-but-unplaced; dream item is THE item")
