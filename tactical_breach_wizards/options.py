@@ -22,6 +22,20 @@ class ConfidencePerBoost(Range):
     default = 5
 
 
+class ExtraConfidenceBoosts(Range):
+    """Extra Confidence Boost items per wizard, on top of the amount needed to clear their
+    wardrobe. Each is worth confidence_per_boost, replaces one generic filler (Donut) in the
+    pool, and is NOT required by logic -- pure slack.
+
+    The slack cushions out-of-order shop purchases (buying below an unbought cheaper outfit
+    can otherwise strand you short of it) and gets shop checks in reach a little sooner.
+    """
+    display_name = "Extra Confidence Boosts"
+    range_start = 0
+    range_end = 10
+    default = 2
+
+
 class CompletionPerkPercent(Range):
     """Perk-power gate for completing a mission (from Act 2 on), as a percent of the mission's
     recommended PER-SLOT perks (the strongest single wizard the game expects there).
@@ -53,6 +67,7 @@ class GoalPerkPercent(Range):
 @dataclass
 class TBWOptions(PerGameCommonOptions):
     confidence_per_boost: ConfidencePerBoost
+    extra_confidence_boosts: ExtraConfidenceBoosts
     completion_perk_percent: CompletionPerkPercent
     goal_perk_percent: GoalPerkPercent
     death_link: DeathLink

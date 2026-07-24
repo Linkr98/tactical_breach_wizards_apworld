@@ -99,15 +99,17 @@ def check_pool_math():
         + (perk_full - 1)  # perk points minus the 1 precollected on the start hero
     )
     fillable = n_locations  # nothing pre-locked; the pool fills every location
+    chars_with_wardrobe = sum(1 for c in data.OUTFIT_TOTAL_COST_PER_CHARACTER.values() if c)
     for k in (2, 5, 20):           # confidence_per_boost extremes + default
         confidence = sum(
             math.ceil(c / k) for c in data.OUTFIT_TOTAL_COST_PER_CHARACTER.values() if c
         )
-        placed = base + confidence
-        filler = fillable - placed
-        assert filler >= 0, f"negative filler for k={k}: {filler}"
-        assert placed + filler == fillable
-    print("[ok] pool math: itempool == 238 across confidence_per_boost 2..20")
+        for extra in (0, 2, 10):   # extra_confidence_boosts extremes + default (per wizard)
+            placed = base + confidence + extra * chars_with_wardrobe
+            filler = fillable - placed
+            assert filler >= 0, f"negative filler for k={k}, extra={extra}: {filler}"
+            assert placed + filler == fillable
+    print("[ok] pool math: itempool == 238 across confidence_per_boost 2..20 x extras 0..10")
 
 
 def check_perk_gating():

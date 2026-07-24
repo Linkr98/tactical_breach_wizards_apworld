@@ -53,7 +53,9 @@ gated by a per-character **staircase** matching the shop's top-to-bottom order: 
 outfit in the shop list needs total confidence ≥ the cumulative cost of it and everything
 above it. Buying top to bottom therefore always stays in logic. Enough boosts are always
 placed for each wizard to clear their whole wardrobe, so the shop stays fully reachable.
-This makes Confidence Boosts **progression**.
+This makes Confidence Boosts **progression**. `extra_confidence_boosts` adds a few spare
+(non-required) boosts per wizard as slack -- they cushion out-of-order purchases and open
+shop checks a little sooner.
 
 - **Start:** one random wizard (precollected with their full base kit and 1 perk point),
   plus one random valid early mission (see `data.is_valid_opener`).

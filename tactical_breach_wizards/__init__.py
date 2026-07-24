@@ -201,6 +201,23 @@ class TBWWorld(World):
             for _ in range(count):
                 pool.append(self.create_item(data.CONFIDENCE_ITEM_NAME[internal]))
 
+        # Extra, non-required boosts (option): classified USEFUL, not progression, so the
+        # staircase's generation guarantee still rests entirely on the required copies above
+        # (fill doesn't collect useful items into logic state). In play they're pure slack:
+        # they cushion out-of-order shop purchases and open shop checks a little sooner.
+        # Each replaces one Donut; capped by remaining pool space (plenty at every option
+        # combo today, but stay safe), distributed round-robin so a cap stays even.
+        extra = self.options.extra_confidence_boosts.value
+        headroom = len(data.LOCATIONS) - len(pool)
+        for _ in range(extra):
+            for internal in data.PLAYABLE_CHARACTERS:
+                if headroom <= 0 or not data.OUTFIT_TOTAL_COST_PER_CHARACTER[internal]:
+                    continue
+                name = data.CONFIDENCE_ITEM_NAME[internal]
+                pool.append(TBWItem(name, ItemClassification.useful,
+                                    self.item_name_to_id[name], self.player))
+                headroom -= 1
+
         # The second mission is no longer auto-handed to the player on finishing the first: it's
         # a normal shuffled mission_access item now (above), so the opening isn't a forced linear
         # pair. Only the start character + start mission are precollected (see generate_early); the
