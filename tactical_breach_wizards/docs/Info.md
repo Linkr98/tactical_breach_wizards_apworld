@@ -49,9 +49,11 @@ custom_worlds/
 
 The mod blocks natural confidence earning, so confidence comes only from `Confidence Boost:
 <Char>` items (each worth `confidence_per_boost`, default 5). Outfit purchases are checks
-gated by a per-character **staircase**: the i-th costliest outfit needs total confidence ≥
-the cumulative cost. Enough boosts are always placed for each wizard to clear their whole
-wardrobe, so the shop stays fully reachable. This makes Confidence Boosts **progression**.
+gated by a per-character **staircase** matching the shop's top-to-bottom order: the i-th
+outfit in the shop list needs total confidence ≥ the cumulative cost of it and everything
+above it. Buying top to bottom therefore always stays in logic. Enough boosts are always
+placed for each wizard to clear their whole wardrobe, so the shop stays fully reachable.
+This makes Confidence Boosts **progression**.
 
 - **Start:** one random wizard (precollected with their full base kit and 1 perk point),
   plus one random valid early mission (see `data.is_valid_opener`).

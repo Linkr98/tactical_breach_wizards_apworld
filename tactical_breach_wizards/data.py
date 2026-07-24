@@ -168,6 +168,13 @@ PERK_POINTS_PER_CHARACTER: Dict[str, int] = {
 # including that outfit. OUTFIT_CONFIDENCE_THRESHOLD maps each outfit_purchase location name
 # -> that cumulative cost; OUTFIT_TOTAL_COST_PER_CHARACTER is the per-wizard sum (the most
 # expensive step), used to size how many boosts to place in the pool.
+#
+# The staircase order must match the in-game shop's top-to-bottom order, so a player who
+# always buys the topmost affordable outfit stays in logic. The shop (OutfitsPanel.
+# SelectCharacter) lists costumes with LINQ's stable OrderBy(unlockCost) over
+# GetCharacterCostumes() order -- the same order the data dump (and therefore LOCATIONS)
+# preserves. Python's sorted() is also stable, so sorting by cost ONLY (no name tie-break)
+# reproduces the shop order exactly, including same-price ties.
 OUTFIT_CONFIDENCE_THRESHOLD: Dict[str, int] = {}
 OUTFIT_TOTAL_COST_PER_CHARACTER: Dict[str, int] = {c: 0 for c in PLAYABLE_CHARACTERS}
 
@@ -177,7 +184,7 @@ for _loc in LOCATIONS:
         _outfits_by_char.setdefault(_loc["character"], []).append(_loc)
 for _ch, _locs in _outfits_by_char.items():
     _cum = 0
-    for _loc in sorted(_locs, key=lambda l: (l["cost"], l["name"])):
+    for _loc in sorted(_locs, key=lambda l: l["cost"]):  # stable: ties keep shop order
         _cum += _loc["cost"]
         OUTFIT_CONFIDENCE_THRESHOLD[_loc["name"]] = _cum
     OUTFIT_TOTAL_COST_PER_CHARACTER[_ch] = _cum
