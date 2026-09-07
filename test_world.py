@@ -174,7 +174,8 @@ def check_team_ability_gate():
 
     # Dream specials don't count (all four, incl. Death's Floor -- a pure dream reward,
     # NOT part of Banks's base kit): dropping every dream ability item changes nothing.
-    no_dreams = [n for n in all_items if n not in set(d.ABILITY_ITEM_FOR_CHARACTER.values())]
+    dream_items = set(d.ABILITY_ITEM_FOR_CHARACTER.values())
+    no_dreams = [n for n in all_items if n not in dream_items]
     assert rules.team_ability_count(FakeState(no_dreams), PLAYER, 5) == 20
 
     # Hardest gate (Fort Osprey 16, a 5-wizard room): passes with everything, fails once
