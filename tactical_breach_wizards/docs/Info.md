@@ -19,8 +19,8 @@ custom_worlds/
     tactical_breach_wizards/    <- the world SOURCE you edit
       __init__.py               <- World subclass, item/region/rule wiring, slot_data
       data.py                   <- loads ap_data.json; name<->id maps; logic helpers
-      options.py                <- yaml options (confidence_per_boost, completion_perk_percent,
-                                   goal_perk_percent, death_link)
+      options.py                <- yaml options (starting_hero, confidence_boosts_per_wizard,
+                                   completion_perk_percent, goal_perk_percent, death_link)
       rules.py                  <- access logic (act gate, character/ability/goal/outfit rules)
       ap_data.json              <- FROZEN id contract + logic metadata (generated - do not hand-edit)
       docs/setup_en.md          <- player setup guide (shown on the AP website)
@@ -48,7 +48,8 @@ custom_worlds/
 ### Confidence economy
 
 The mod blocks natural confidence earning, so confidence comes only from `Confidence Boost:
-<Char>` items (each worth `confidence_per_boost`, default 5). Outfit purchases are checks
+<Char>` items. Every wizard gets `confidence_boosts_per_wizard` boosts (default 5); each
+boost's value scales with that wizard's total wardrobe cost. Outfit purchases are checks
 gated by a per-character **staircase** matching the shop's top-to-bottom order: the i-th
 outfit in the shop list needs total confidence ≥ the cumulative cost of it and everything
 above it. Buying top to bottom therefore always stays in logic. Enough boosts are always
@@ -75,9 +76,10 @@ Door" needs Banks). Missions, halfway checkpoints, and goals can also require sp
 see `HOWTO-add-mission-requirements.md` there). See `rules.py` /
 `data.effective_required_characters` for the full model.
 
-**Halfway checkpoints** are requirement-free by default (just reach the mission), which
-is what makes them good early checks; the full completion automatically inherits any
-half requirements you add.
+**Halfway checkpoints** carry no ability requirements by default (just reach the mission)
+but ARE perk-gated exactly like the mission's completion (same `completion_perk_percent`
+threshold), so reaching the back half demands the same wizard strength as finishing; the
+full completion automatically inherits any half requirements you add.
 
 **Perk-power gating.** A wizard's perk power = their perk-tree points (always shuffled in
 as progression) + 1 if their dream ability is unlocked (max: Zan 7, Jen/Banks/Dall 6,
@@ -85,9 +87,15 @@ Rion 5; Zan has no dream perk since SeerFinale was removed). Because a wizard ca
 fielded in **multiple slots**, the binding constraint is your *best* unlocked wizard, not
 the team total. So the gate is **per-slot**: each mission has a recommended per-slot value
 (the strongest single wizard the game expects there, from the `PerkProgress` dev
-snapshots). A mission's **completion** (from Act 3 on) needs your best unlocked wizard ≥
-`completion_perk_percent`% of it; its **confidence goals** (from Act 2 on) need ≥
-`goal_perk_percent`%. Act 1 stays ungated.
+snapshots). A mission's **completion and halfway** need `completion_perk_percent`% of it;
+its **confidence goals** need `goal_perk_percent`% (both gates apply in every act;
+scripted tutorials are exempt). **Anxiety dreams field a fully scripted squad**, so their
+gates check the best of that forced cast (`data.DREAM_FORCED_CAST`, from the generator's
+`AUTO_GIVEN_CHARACTERS`) instead of your best wizard overall — you can't carry Rion's
+dream with a maxed Zan — and the threshold clamps to the cast's maximum possible power.
+Dream recommendations from the dump are halved (except Banks's roster-wide dream): those
+levels field TWO copies of their wizard, so the dev snapshot double-counted (in-game
+Rion's dream suggests 3, the dump said 6) — see `data.recommended_perks_for_stage`.
 
 ## Day-to-day development
 

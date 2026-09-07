@@ -78,6 +78,23 @@ def best_unlocked_perks(state, player: int) -> int:
     return best
 
 
+def gate_perk_power(state, player: int, stage: str) -> int:
+    """The perk power a stage's perk gates check against. Anxiety dreams field a FULLY
+    scripted squad (data.DREAM_FORCED_CAST), so their gates check the best of THAT cast --
+    you can't bring your strongest wizard into someone else's dream. Every other mission
+    lets you field anyone, so it's the best unlocked wizard."""
+    cast = data.DREAM_FORCED_CAST.get(stage)
+    if cast is None:
+        return best_unlocked_perks(state, player)
+    best = 0
+    for internal in cast:
+        if has_character(state, player, internal):
+            p = effective_perks_for_character(state, player, internal)
+            if p > best:
+                best = p
+    return best
+
+
 def team_ability_count(state, player: int, squad_size: int = DEFAULT_SQUAD_SIZE) -> int:
     """How many distinct abilities the player's best possible squad for a ``squad_size``-wizard
     room can field: for each UNLOCKED wizard, ABILITIES_PER_WIZARD minus their still-missing
@@ -98,6 +115,24 @@ def team_ability_count(state, player: int, squad_size: int = DEFAULT_SQUAD_SIZE)
 def _perk_threshold(recommended: int, percent: int) -> int:
     """ceil(recommended * percent / 100) -- 'at least percent% of the per-slot recommended'."""
     return -(-(recommended * percent) // 100)
+
+
+def perk_need_for_stage(stage: str, act: int, percent: int, min_act: int) -> int:
+    """The perk-power threshold a stage's perk gate demands: ceil(recommended * percent / 100).
+    0 for scripted tutorials and acts below the gate floor. For anxiety dreams the threshold is
+    CLAMPED to the forced cast's maximum possible power (perk tree + dream ability): a high
+    percent can never demand more than the scripted squad can ever reach (Rion caps at 5
+    while his dream recommends 6, so at 100% his dream demands a fully maxed Rion, not an
+    impossible 6)."""
+    if stage in data.SCRIPTED_TUTORIAL_STAGES or act < min_act:
+        return 0
+    need = _perk_threshold(data.recommended_perks_for_stage(stage), percent)
+    cast = data.DREAM_FORCED_CAST.get(stage)
+    if cast:
+        cap = max(data.PERK_POINTS_PER_CHARACTER[c]
+                  + (1 if c in data.ABILITY_ITEM_FOR_CHARACTER else 0) for c in cast)
+        need = min(need, cap)
+    return need
 
 
 def has_abilities(state, player: int, savenames) -> bool:
@@ -123,17 +158,20 @@ def satisfies_any_groups(state, player: int, groups) -> bool:
     return True
 
 
-def make_half_rule(player: int, loc: dict):
+def make_half_rule(player: int, loc: dict, percent: int):
     """mission_half gate: the halfway checkpoint of a multi-room mission. It lives in the
     mission's region (so it already inherits mission access + the act gate + the mission's firm
-    required characters). On top of that it imposes ONLY the halfway extras (HALF_REQUIRED* in the
-    generator) -- no completion-ability or perk gate -- which makes it an easier, EARLIER check
-    than finishing the mission. Returns None when there are no halfway extras (region reachability
-    is then sufficient)."""
+    required characters). On top of that it imposes the halfway extras (HALF_REQUIRED* in the
+    generator) AND the same perk gate as the mission's completion (same recommended-perk
+    threshold, same tutorial exemption, same forced-cast handling) -- reaching the back half
+    demands the same wizard strength as finishing, only the completion-only abilities are
+    spared. Returns None when nothing applies (region reachability is then sufficient)."""
+    stage = loc["missionStageID"]
     extra_chars = loc.get("requiredCharacters", [])
     abilities = loc.get("requiredAbilities", [])
     any_groups = loc.get("requiredAnyOf", [])
-    if not extra_chars and not abilities and not any_groups:
+    perk_need = perk_need_for_stage(stage, loc["act"], percent, PERK_GATE_MIN_ACT_COMPLETION)
+    if not extra_chars and not abilities and not any_groups and perk_need <= 0:
         return None
 
     def rule(state) -> bool:
@@ -141,7 +179,8 @@ def make_half_rule(player: int, loc: dict):
             if not has_character(state, player, c):
                 return False
         return (has_abilities(state, player, abilities)
-                and satisfies_any_groups(state, player, any_groups))
+                and satisfies_any_groups(state, player, any_groups)
+                and gate_perk_power(state, player, stage) >= perk_need)
 
     return rule
 
@@ -149,8 +188,9 @@ def make_half_rule(player: int, loc: dict):
 def make_completion_rule(player: int, loc: dict, percent: int):
     """mission_complete gate: needs every ability required to complete the mission, PLUS every
     halfway extra (a mission can only be finished by first reaching its halfway point, so the full
-    completion always assumes the whole restriction set of the half), AND the best unlocked wizard
-    at >= percent% of the recommended per-slot perks (every act, from PERK_GATE_MIN_ACT_COMPLETION
+    completion always assumes the whole restriction set of the half), AND gate_perk_power (the
+    best unlocked wizard -- or, for anxiety dreams, the best of the dream's forced cast) at
+    >= percent% of the recommended per-slot perks (every act, from PERK_GATE_MIN_ACT_COMPLETION
     on). Scripted tutorials are exempt from the perk gate. Returns None if nothing applies."""
     stage = loc["stageID"]
     # Union the completion abilities with the halfway abilities (full >= half).
@@ -159,9 +199,7 @@ def make_completion_rule(player: int, loc: dict, percent: int):
     half_chars = data.mission_half_required_characters(stage)
     # OR-gates likewise: the completion's own groups plus the halfway's (full >= half).
     any_groups = data.mission_required_any(stage) + data.mission_half_required_any(stage)
-    perk_need = 0
-    if stage not in data.SCRIPTED_TUTORIAL_STAGES and loc["act"] >= PERK_GATE_MIN_ACT_COMPLETION:
-        perk_need = _perk_threshold(data.recommended_perks_for_stage(stage), percent)
+    perk_need = perk_need_for_stage(stage, loc["act"], percent, PERK_GATE_MIN_ACT_COMPLETION)
     if not abilities and not half_chars and not any_groups and perk_need <= 0:
         return None
 
@@ -173,7 +211,7 @@ def make_completion_rule(player: int, loc: dict, percent: int):
                 return False
         if not satisfies_any_groups(state, player, any_groups):
             return False
-        return best_unlocked_perks(state, player) >= perk_need
+        return gate_perk_power(state, player, stage) >= perk_need
 
     return rule
 
@@ -207,17 +245,16 @@ def make_confidence_goal_rule(player: int, loc: Dict, percent: int):
     even the mission's own recruit; controlling a wizard means having unlocked them), any
     extra GOAL_REQUIREMENTS characters/abilities, a team-wide ability count when the goal
     needs many abilities at once (``requiredTotalAbilities``, e.g. "use 9 abilities in one
-    turn"), AND the best unlocked wizard at >= percent% of the mission's recommended
-    per-slot perks (every act, from PERK_GATE_MIN_ACT_GOAL on)."""
+    turn"), AND gate_perk_power (best unlocked wizard, or the dream's forced cast) at
+    >= percent% of the mission's recommended per-slot perks (every act, from
+    PERK_GATE_MIN_ACT_GOAL on)."""
     char = loc["character"]
     char_required = True
     extra_chars = loc.get("requiredCharacters", [])
     abilities = loc.get("requiredAbilities", [])
     team_abilities_needed = int(loc.get("requiredTotalAbilities", 0) or 0)
     squad_size = int(loc.get("squadSize", 0) or 0) or DEFAULT_SQUAD_SIZE
-    need = 0
-    if loc["missionStageID"] not in data.SCRIPTED_TUTORIAL_STAGES and loc["act"] >= PERK_GATE_MIN_ACT_GOAL:
-        need = _perk_threshold(data.recommended_perks_for_stage(loc["missionStageID"]), percent)
+    need = perk_need_for_stage(loc["missionStageID"], loc["act"], percent, PERK_GATE_MIN_ACT_GOAL)
 
     if not char_required and not extra_chars and not abilities and need <= 0 and team_abilities_needed <= 0:
         return None  # region reachability is sufficient
@@ -232,7 +269,7 @@ def make_confidence_goal_rule(player: int, loc: Dict, percent: int):
             return False
         if team_abilities_needed > 0 and team_ability_count(state, player, squad_size) < team_abilities_needed:
             return False
-        return best_unlocked_perks(state, player) >= need
+        return gate_perk_power(state, player, loc["missionStageID"]) >= need
 
     return rule
 
@@ -242,8 +279,9 @@ def make_outfit_rule(player: int, loc: Dict, confidence_per_boost: int):
     outfit on the staircase (total confidence >= cumulative cost up to this outfit).
 
     Confidence comes only from `Confidence Boost: <Char>` items (natural earning is blocked
-    by the mod), each worth ``confidence_per_boost``, so the requirement is a number of that
-    wizard's boosts."""
+    by the mod), each worth ``confidence_per_boost`` -- THIS wizard's per-boost value, which
+    scales with their wardrobe total (see data.confidence_boost_value) -- so the requirement
+    is a number of that wizard's boosts."""
     char = loc["character"]
     confidence_item = data.CONFIDENCE_ITEM_NAME[char]
     threshold = data.OUTFIT_CONFIDENCE_THRESHOLD[loc["name"]]

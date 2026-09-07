@@ -141,9 +141,19 @@ for _it in ITEMS:
 
 def recommended_perks_for_stage(stage_id: str) -> int:
     """Recommended PER-SLOT perks for a mission -- the strongest single wizard expected
-    there (0 if unknown). Gated against the player's best unlocked wizard."""
+    there (0 if unknown). Gated against the player's best unlocked wizard (or a dream's
+    forced cast).
+
+    DREAM CORRECTION (project owner, 2026-09-02): the dump's recommendedPerks for anxiety
+    dreams is DOUBLED -- those levels field TWO copies of the dream's wizard, so the dev
+    snapshot counts their perks twice (in-game Rion's dream suggests 3; the dump says 6).
+    Halve it (ceil) for dreams -- EXCEPT Banks's, whose squad is the whole roster rather
+    than a duplicated wizard, so its value is already per-slot."""
     m = MISSION_BY_STAGE.get(stage_id)
-    return int(m.get("recommendedPerks", 0)) if m else 0
+    rec = int(m.get("recommendedPerks", 0)) if m else 0
+    if stage_id in DREAM_REQUIRED_CHARACTER and stage_id != BANKS_DREAM_STAGE:
+        rec = -(-rec // 2)  # ceil(rec / 2)
+    return rec
 
 # How many perk points (perk-tree ability upgrades) each wizard can actually spend in
 # the base game -- i.e. the number of nodes in their perk tree. The mod suppresses
@@ -189,6 +199,16 @@ for _ch, _locs in _outfits_by_char.items():
         OUTFIT_CONFIDENCE_THRESHOLD[_loc["name"]] = _cum
     OUTFIT_TOTAL_COST_PER_CHARACTER[_ch] = _cum
 
+
+def confidence_boost_value(internal: str, boosts_per_wizard: int) -> int:
+    """How much confidence ONE of this wizard's Confidence Boost items grants:
+    ceil(total wardrobe cost / boosts_per_wizard), so every wizard's wardrobe clears in the
+    same number of boosts no matter how expensive it is (Jen's 60 vs Rion's 12). 0 for a
+    wizard with no outfits (no boosts are placed for them)."""
+    total = OUTFIT_TOTAL_COST_PER_CHARACTER[internal]
+    return -(-total // boosts_per_wizard) if total else 0
+
+
 # The victory location: completing the finale roof mission.
 GOAL_LOCATION_KEY: str = GOAL["locationKey"]            # "mission:Game_Finale_Roof"
 GOAL_LOCATION_NAME: str = next(
@@ -228,6 +248,26 @@ for _m in MISSIONS:
         _who = _DISPLAY_TO_INTERNAL.get(_sid.rsplit("_", 1)[-1])
         if _who:
             DREAM_REQUIRED_CHARACTER[_sid] = _who
+
+# Banks's dream is the odd one out twice over: its squad is the ENTIRE roster (not two
+# copies of one wizard), so its dump recommendation is per-slot as-is (no halving in
+# recommended_perks_for_stage) and its forced cast is everyone.
+BANKS_DREAM_STAGE = "Game_Lucid_Dream_Banks"
+
+# Scripted squad members a mission auto-gives (generator knob AUTO_GIVEN_CHARACTERS; the same
+# data drives the mod's launch gates).
+AUTO_GIVEN_CHARACTERS: Dict[str, List[str]] = {
+    k: list(v) for k, v in _DATA.get("autoGivenCharacters", {}).items()
+}
+
+# An anxiety dream's squad is FULLY scripted: the dream's own wizard plus any auto-given
+# extras (Banks's dream fields all five; Zan's fields Zan+Jen; the rest are solo). Perk gates
+# on a dream therefore check the best of THIS cast -- the player can't field their strongest
+# wizard there (see rules.gate_perk_power).
+DREAM_FORCED_CAST: Dict[str, List[str]] = {
+    _sid: sorted(set(AUTO_GIVEN_CHARACTERS.get(_sid, [])) | {_who})
+    for _sid, _who in DREAM_REQUIRED_CHARACTER.items()
+}
 
 
 _ABILITY_NAME_BY_STAGE = {it["stageID"]: it["name"] for it in ITEMS if it["category"] == "ability"}
