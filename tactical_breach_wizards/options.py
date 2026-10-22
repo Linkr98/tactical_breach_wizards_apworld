@@ -2,57 +2,87 @@
 
 from dataclasses import dataclass
 
-from Options import DeathLink, PerGameCommonOptions, Range
+from Options import Choice, DeathLink, PerGameCommonOptions, Range, Toggle
 
 
-class ConfidencePerBoost(Range):
-    """How much confidence each "Confidence Boost" item grants the matching wizard.
-
-    The mod blocks natural confidence earning, so these items are the only way to afford
-    outfits at the shop -- and each outfit purchase is a check. Enough boosts are always
-    placed for every wizard to clear their whole wardrobe; this value just sets the
-    granularity. A lower value means more, smaller boosts (the shop economy is felt more);
-    a higher value means fewer, larger boosts (more room for other filler).
-
-    Must be at least 2: at 1 the pool can't hold enough boosts to afford every outfit.
+class StartingHero(Choice):
+    """Which wizard you start with. Starting wizard stats with 1 perk point and all abilities unlocked(If ShuffleBaseAbilities = true). 
     """
-    display_name = "Confidence per Boost"
-    range_start = 2
+    display_name = "Starting Hero"
+    option_zan = 0
+    option_jen = 1
+    option_banks = 2
+    option_dall = 3
+    option_rion = 4
+    default = "random"
+
+
+class ConfidenceBoostsPerWizard(Range):
+    """How many "Confidence Boost" items to unlock all outfit checks for each wizard.
+    More of these reduces filler.
+    """
+    display_name = "Confidence Boosts per Wizard"
+    range_start = 1
     range_end = 20
-    default = 5
+    default = 10
+
+
+class ExtraConfidenceBoosts(Range):
+    """Extra Confidence Boost items per wizard, on top of the amount needed to clear their
+    wardrobe. Gives same amount of points as the normal ones but not required for logic so your less likely to get hard stuck, or soft lock yourself.
+    If there is a low number of boosts per wizard, you will want a low number of this to avoid breaking logic to much.
+    It is designed for if you have a large number of items, missing one confidence boost dosn't hold everything up/
+    """
+    display_name = "Extra Confidence Boosts"
+    range_start = 0
+    range_end = 10
+    default = 2
 
 
 class CompletionPerkPercent(Range):
-    """Perk-power gate for completing a mission (from Act 2 on), as a percent of the mission's
-    recommended PER-SLOT perks (the strongest single wizard the game expects there).
-
-    A wizard's perk power = their perk-tree points (always shuffled in as progression) + 1 if
-    their dream ability is unlocked. Because you can field one wizard in multiple slots, the
-    check is against your BEST unlocked wizard -- so you can't clear a too-hard late mission
-    without at least one suitably strong wizard.
-    note: 70 and above will start causing fill issues sometimes.
+    """What percent of the perks you would have at the point of the story is needed for logic to think a mission is beatable.
+    This math uses the total perks for your team and will count your best wizard multiple times, so the game expects things like a team of 5 Zan's.
     """
     display_name = "Completion Perk %"
-    range_start = 20
+    range_start = 25
     range_end = 100
-    default = 40
+    default = 50
 
 
 class GoalPerkPercent(Range):
-    """Perk-power gate for a mission's confidence goals (from Act 2 on), as a percent of the
-    mission's recommended per-slot perks, checked against your best unlocked wizard. Confidence
-    goals are harder than just clearing the mission, so this defaults higher. 0 disables it.
-    note: lower numbers may be impossible
+    """Same as CompletionPerkPercent but for confidence goals. Should always be higher then Completion perk percent.
     """
     display_name = "Confidence Goal Perk %"
-    range_start = 60
+    range_start = 25
     range_end = 100
-    default = 70
+    default = 60
+
+
+class ShuffleBaseAbilities(Toggle):
+    """Shuffle each wizard's BASE-KIT abilities (Zan's Predictive Bolt / Time Boost / False
+    Prophet, Jen's Broom Breach / Gale Grenade / Chain Bolt, Banks's Spectral Skull /
+    Transference, Rion's Spore Grenade) into the multiworld as items.
+    """
+    display_name = "Shuffle Base Abilities"
+
+
+class ArmouryCachesGoal(Toggle):
+    """Include Dall's "Destroy the Caches" confidence goal in The B Team's fifth room (The
+    Armoury) as a check.
+
+    This goal is for some reason one of the hardest things in the game.
+    I dont like it and I didnt want it to skew the Goal Perk % too much, so I made removed by default.
+    """
+    display_name = "Armoury Caches Goal"
 
 
 @dataclass
 class TBWOptions(PerGameCommonOptions):
-    confidence_per_boost: ConfidencePerBoost
+    starting_hero: StartingHero
+    shuffle_base_abilities: ShuffleBaseAbilities
+    armoury_caches_goal: ArmouryCachesGoal
+    confidence_boosts_per_wizard: ConfidenceBoostsPerWizard
+    extra_confidence_boosts: ExtraConfidenceBoosts
     completion_perk_percent: CompletionPerkPercent
     goal_perk_percent: GoalPerkPercent
     death_link: DeathLink

@@ -41,15 +41,19 @@ PLAYER = 1
 
 
 class FakeState:
-    """Minimal CollectionState stand-in: has(name, player)."""
+    """Minimal CollectionState stand-in: has(name, player). Optional ``counts`` pins exact
+    copies of an item (e.g. perk points) instead of the plenty-of-everything default."""
 
-    def __init__(self, item_names):
+    def __init__(self, item_names, counts=None):
         self._items = set(item_names)
+        self._counts = dict(counts or {})
 
     def has(self, name, player):
-        return name in self._items
+        return name in self._items or self._counts.get(name, 0) > 0
 
     def count(self, name, player):
+        if name in self._counts:
+            return self._counts[name]
         # Simulate owning plenty of each collected item (enough for any staircase step).
         return 999 if name in self._items else 0
 
@@ -92,22 +96,42 @@ def check_pool_math():
     # their slots become Donut filler, so they don't appear in `base`. The second mission is a
     # normal shuffled item now (no forced opening lock), so mission_access only drops the 1
     # precollected start mission and no location is pre-locked.
+    # Base-kit abilities: 9 live items (Dall has none); with shuffle_base_abilities OFF (the
+    # default) every one is precollected, ON only the start hero's kit is. Either way they
+    # come out of the pool and Donut fills the gap.
+    assert len(data.BASE_ABILITY_ITEM_NAMES) == 9, data.BASE_ABILITY_ITEM_NAMES
+    assert set(data.BASE_ABILITY_ITEM_NAMES) <= set(data.ABILITY_ITEM_NAMES)
+    biggest_kit = max(len(v) for v in data.BASE_ABILITY_ITEMS_BY_CHARACTER.values())
     base = (
         (sum(1 for it in data.ITEMS if it["category"] == "character") - 1)        # minus start hero
         + (sum(1 for it in data.ITEMS if it["category"] == "mission_access") - 1)  # minus start mission
-        + len(data.ABILITY_ITEM_NAMES)  # live abilities only -- retired ones are never placed
+        + len(data.ABILITY_ITEM_NAMES) - biggest_kit  # live abilities minus (at least) the hero's kit
         + (perk_full - 1)  # perk points minus the 1 precollected on the start hero
     )
-    fillable = n_locations  # nothing pre-locked; the pool fills every location
-    for k in (2, 5, 20):           # confidence_per_boost extremes + default
-        confidence = sum(
-            math.ceil(c / k) for c in data.OUTFIT_TOTAL_COST_PER_CHARACTER.values() if c
-        )
-        placed = base + confidence
-        filler = fillable - placed
-        assert filler >= 0, f"negative filler for k={k}: {filler}"
-        assert placed + filler == fillable
-    print("[ok] pool math: itempool == 238 across confidence_per_boost 2..20")
+    # Optional checks: the Armoury caches goal is a real confidence_goal location that the
+    # default yaml simply doesn't create -> one fewer location to fill.
+    armoury = data.LOCATION_BY_KEY[data.ARMOURY_CACHES_GOAL_KEY]
+    assert armoury["category"] == "confidence_goal" and armoury["character"] == "RiotPriest", armoury
+    fillable = n_locations - 1  # nothing pre-locked; the tightest case (armoury goal off)
+    chars_with_wardrobe = sum(1 for c in data.OUTFIT_TOTAL_COST_PER_CHARACTER.values() if c)
+    for n in (1, 5, 20):           # confidence_boosts_per_wizard extremes + default
+        # Each wizard with a wardrobe gets exactly n boosts; each boost's value scales with
+        # their total so n boosts always afford the whole wardrobe.
+        for ch, total in data.OUTFIT_TOTAL_COST_PER_CHARACTER.items():
+            if not total:
+                continue
+            value = data.confidence_boost_value(ch, n)
+            assert value * n >= total, (ch, n, value, total)
+            required = math.ceil(total / value)
+            assert 1 <= required <= n, (ch, n, value, required)
+        confidence = n * chars_with_wardrobe
+        for extra in (0, 2, 10):   # extra_confidence_boosts extremes + default (per wizard)
+            placed = base + confidence + extra * chars_with_wardrobe
+            filler = fillable - placed
+            assert filler >= 0, f"negative filler for n={n}, extra={extra}: {filler}"
+            assert placed + filler == fillable
+    print("[ok] pool math: itempool fills 237/238 locations across confidence_boosts_per_wizard "
+          "1..20 x extras 0..10, base abilities shuffled or not")
 
 
 def check_perk_gating():
@@ -221,6 +245,66 @@ def check_any_of_gate():
     print("[ok] OR-gate: The Recording needs Dall | Banks+Death's Floor | Jen+Broom Breach")
 
 
+def check_dream_forced_cast_and_half_gate():
+    """Anxiety dreams gate perks on their FULLY scripted cast (not the player's best wizard),
+    halfway checkpoints carry the same perk gate as their completion, and a dream's threshold
+    clamps to what its cast can ever reach."""
+    d = data
+    # Forced casts = the dream's wizard + the generator's AUTO_GIVEN extras.
+    assert d.DREAM_FORCED_CAST["Game_Lucid_Dream_Rion"] == ["Druid"], d.DREAM_FORCED_CAST
+    assert set(d.DREAM_FORCED_CAST["Game_Lucid_Dream_Banks"]) == set(d.PLAYABLE_CHARACTERS)
+    assert set(d.DREAM_FORCED_CAST["Game_Lucid_Dream_Zan"]) == {"NavySeer", "WitchCop"}
+
+    # Dream recommendations are HALVED (ceil) -- the dump counted two copies of the dream's
+    # wizard -- except Banks's roster-wide dream, which stays as dumped (raw: Jen 3, Banks 5,
+    # Dall 5, Rion 6, Zan 6).
+    halved = {sid: d.recommended_perks_for_stage(sid) for sid in d.DREAM_REQUIRED_CHARACTER}
+    assert halved == {"Game_Lucid_Dream_Jen": 2, "Game_Lucid_Dream_Banks": 5,
+                      "Game_Lucid_Dream_Dall": 3, "Game_Lucid_Dream_Rion": 3,
+                      "Game_Lucid_Dream_Zan": 3}, halved
+    # Even at 100%, every dream's threshold stays within what its forced cast can ever
+    # reach (perk tree + dream ability) -- the perk_need_for_stage clamp's invariant.
+    for sid, cast in d.DREAM_FORCED_CAST.items():
+        cap = max(d.PERK_POINTS_PER_CHARACTER[c]
+                  + (1 if c in d.ABILITY_ITEM_FOR_CHARACTER else 0) for c in cast)
+        assert rules.perk_need_for_stage(sid, 3, 100, 0) <= cap, (sid, cap)
+
+    sid = "Game_Lucid_Dream_Rion"  # act 3, recommendedPerks 6 -> halved 3, cast = Rion alone
+    comp = next(l for l in d.LOCATIONS if l["category"] == "mission_complete" and l["stageID"] == sid)
+    half = next(l for l in d.LOCATIONS if l["category"] == "mission_half" and l["missionStageID"] == sid)
+    rule = rules.make_completion_rule(PLAYER, comp, 50)       # need ceil(3*0.5) = 2
+    half_rule = rules.make_half_rule(PLAYER, half, 50)        # same gate now
+    assert rule is not None and half_rule is not None
+
+    rion = d.CHARACTER_ITEM_NAME["Druid"]
+    zan = d.CHARACTER_ITEM_NAME["NavySeer"]
+    rion_kit = d.BASE_ABILITY_ITEMS_BY_CHARACTER["Druid"]
+    zan_kit = d.BASE_ABILITY_ITEMS_BY_CHARACTER["NavySeer"]
+    # A maxed Zan can NOT carry Rion's dream -- the squad there is forced to Rion.
+    strong_zan = FakeState([rion, zan] + zan_kit,
+                           counts={d.PERK_ITEM_NAME["NavySeer"]: 7, d.PERK_ITEM_NAME["Druid"]: 0})
+    assert not rule(strong_zan), "maxed Zan satisfied Rion's dream gate"
+    assert not half_rule(strong_zan), "maxed Zan satisfied Rion's dream HALF gate"
+    # Rion himself at power 2 (full kit + 2 perks) clears both at 50%.
+    rion_2 = FakeState([rion] + rion_kit, counts={d.PERK_ITEM_NAME["Druid"]: 2})
+    assert rule(rion_2) and half_rule(rion_2)
+    # At 100% the need is the full (halved) recommendation of 3: power 2 fails, power 3 passes.
+    rule100 = rules.make_completion_rule(PLAYER, comp, 100)
+    rion_3 = FakeState([rion] + rion_kit, counts={d.PERK_ITEM_NAME["Druid"]: 3})
+    assert rule100(rion_3), "power 3 should meet the halved 100% threshold"
+    assert not rule100(rion_2), "power 2 passed a threshold of 3"
+
+    # Every non-tutorial halfway with a perk recommendation now carries a gate.
+    gated = 0
+    for l in d.LOCATIONS:
+        if l["category"] != "mission_half" or l["missionStageID"] in d.SCRIPTED_TUTORIAL_STAGES:
+            continue
+        if d.recommended_perks_for_stage(l["missionStageID"]) > 0:
+            assert rules.make_half_rule(PLAYER, l, 50) is not None, l["name"]
+            gated += 1
+    print(f"[ok] dream forced-cast perk gate (Rion-only cast, clamp at 100%) + {gated} perk-gated halfway checks")
+
+
 def check_retired_items():
     """Retired items (merged duplicates) keep their frozen id but are invisible to logic:
     the base-kit Death's Floor copy stays defined for old seeds, while the dream item is
@@ -258,7 +342,7 @@ def _location_reachable(state, loc, mission_reach):
     if cat == "mission_half":
         if not mission_reach[loc["missionStageID"]]:
             return False
-        rule = rules.make_half_rule(PLAYER, loc)
+        rule = rules.make_half_rule(PLAYER, loc, 50)
         return True if rule is None else rule(state)
     if cat == "mission_complete":
         if not mission_reach[loc["stageID"]]:
@@ -391,6 +475,7 @@ def main():
     check_perk_gating()
     check_team_ability_gate()
     check_any_of_gate()
+    check_dream_forced_cast_and_half_gate()
     check_retired_items()
     check_max_reachability()
     print("\nAll checks passed.")

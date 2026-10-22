@@ -19,14 +19,27 @@
 In the Archipelago Launcher, generate a template yaml ("Generate Template Options")
 and edit the **Tactical Breach Wizards** section. Options:
 
-- `completion_perk_percent` — from Act 2 on, completing a mission requires your best wizard
-  to have this percent of its recommended per-slot perks (default 25; 0 disables).
-- `goal_perk_percent` — same idea for confidence goals, also from Act 2 on, defaulting higher
-  (default 50; 0 disables). A wizard's perk power counts their perk points + their dream
-  ability, and one strong wizard can be fielded in multiple slots, so these check your
-  strongest unlocked wizard — keeping you from being underpowered for a late mission.
-- `confidence_per_boost` — how much confidence each "Confidence Boost" item grants
-  (default 5). Confidence is earned only from these items and is spent at the outfit shop.
+- `completion_perk_percent` — completing a mission (or reaching its halfway checkpoint)
+  requires this percent of its recommended per-slot perks (default 50, range 25–100).
+- `goal_perk_percent` — same idea for confidence goals (default 60, range 25–100); keep it
+  at or above `completion_perk_percent`. A wizard's perk power counts their perk points + their dream ability, and one strong wizard can be fielded
+  in multiple slots, so these check your strongest unlocked wizard — except in anxiety
+  dreams, whose squad is scripted: there the gate checks the dream's own cast (Rion's dream
+  needs a perked Rion, not a strong Zan).
+- `starting_hero` — which wizard you start with: `zan`, `jen`, `banks`, `dall`, `rion`,
+  or `random` (the default) to let the seed pick.
+- `shuffle_base_abilities` — off by default: every wizard has their full base kit as soon
+  as you unlock them, and only the four anxiety-dream ability upgrades are shuffled. Turn on
+  to shuffle the base abilities (Predictive Bolt, Broom Breach, Spectral Skull, ...) into the
+  multiworld too — a new wizard may be missing part of their kit until you find it.
+- `armoury_caches_goal` — off by default: Dall's "Destroy the Caches" goal in The B Team's
+  Armoury room is far harder than any other goal, so it isn't a check unless you turn this on.
+- `confidence_boosts_per_wizard` — how many "Confidence Boost" items it takes to clear a
+  wizard's whole wardrobe (default 10). Each boost's value scales with that wizard's total
+  wardrobe cost, so every wizard needs the same number of boosts. Confidence is earned only
+  from these items and is spent at the outfit shop.
+- `extra_confidence_boosts` — spare boosts per wizard on top of that (default 2). Not
+  required by logic; they give slack so one missing boost doesn't hold everything up.
 - `death_link` — optional; off by default. When anyone in the multiworld dies, one of
   your wizards gets a lethal condition they must out-run by finishing the room's
   objectives that turn — and your deaths are shared the same way.
@@ -34,13 +47,14 @@ and edit the **Tactical Breach Wizards** section. Options:
 ## What is randomized
 
 - **Items found in the multiworld:** the five wizards, access to each campaign mission,
-  14 abilities (each wizard's base kit plus the four special dream abilities), perk
-  points, and per-character Confidence Boosts (the only way to earn confidence to spend
+  the four special dream abilities (plus each wizard's base kit if `shuffle_base_abilities`
+  is on), perk points, and per-character Confidence Boosts (the only way to earn confidence to spend
   at the shop). Cosmetic outfits are not items — buying one at the shop is itself a
   check, and the purchase gives you the outfit as normal.
 - **Checks (locations):** completing each mission, reaching each mission's halfway
   point, each in-mission confidence goal, buying each outfit in the shop, unlocking each
-  dream ability, and recruiting each wizard — 238 in all.
+  dream ability, and recruiting each wizard — 238 in all (237 with the Armoury caches goal
+  left out, the default).
 
 You start with **one random wizard** (with their full base kit and one perk point) and
 **one random early mission**. Everything else is reached through the mod's mission
