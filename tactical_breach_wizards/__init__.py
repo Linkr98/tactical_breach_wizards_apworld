@@ -7,7 +7,8 @@ frozen item/location id contract carried in ``ap_data.json``.
 What gets shuffled:
   * 5 playable wizards (characters)
   * 29 campaign mission-access unlocks
-  * 14 abilities (4 special "dream" PerkUnlocks + 10 base-kit abilities)
+  * abilities: the 4 special "dream" PerkUnlocks always; the base-kit abilities only with
+    the `shuffle_base_abilities` option (off by default -> every kit starts in hand)
   * perk points (progression; exactly each wizard's perk-tree size)
   * per-character "Confidence Boost" items (the only confidence source)
   * "Donut" filler pads the remainder
@@ -160,8 +161,12 @@ class TBWWorld(World):
         self.multiworld.push_precollected(self.create_item(data.PERK_ITEM_NAME[self.start_hero]))
         # ...and the starting wizard's full base kit, so they're penalty-free (see the missing-
         # ability penalty in rules): this gives the fill one reliable wizard to satisfy perk
-        # gates through. Other wizards still start kitless and must earn their kit to count.
-        for base_item in data.BASE_ABILITY_ITEMS_BY_CHARACTER.get(self.start_hero, []):
+        # gates through. Other wizards still start kitless and must earn their kit to count --
+        # UNLESS base abilities aren't shuffled (the default), in which case EVERY wizard's kit
+        # is precollected: the items still exist (the mod grants abilities from items, and every
+        # ability rule reads the same state), they just start in hand, so a wizard is complete
+        # the moment their character item arrives.
+        for base_item in self._precollected_base_abilities():
             self.multiworld.push_precollected(self.create_item(base_item))
         # Widen the opening for the FILL: force two more valid-opener mission accesses into
         # the earliest reachable checks (AP early_items). A single-room opener can make
@@ -175,8 +180,27 @@ class TBWWorld(World):
         for m in extra_openers[:2]:
             self.multiworld.early_items[self.player][data.MISSION_ITEM_NAME[m["stageID"]]] = 1
 
+    def _precollected_base_abilities(self) -> List[str]:
+        """Base-kit ability items handed to the player at start: every wizard's kit when
+        `shuffle_base_abilities` is off, else only the starting wizard's."""
+        if not self.options.shuffle_base_abilities.value:
+            return list(data.BASE_ABILITY_ITEM_NAMES)
+        return list(data.BASE_ABILITY_ITEMS_BY_CHARACTER.get(self.start_hero, []))
+
+    def _excluded_location_keys(self) -> List[str]:
+        """Optional checks this seed leaves OUT entirely (never created, never expected)."""
+        keys: List[str] = []
+        if not self.options.armoury_caches_goal.value:
+            keys.append(data.ARMOURY_CACHES_GOAL_KEY)
+        return keys
+
+    def _location_count(self) -> int:
+        """How many locations this seed actually creates (drives the pool size)."""
+        return len(data.LOCATIONS) - len(self._excluded_location_keys())
+
     def create_items(self) -> None:
         pool: List[Item] = []
+        precollected_abilities = set(self._precollected_base_abilities())
 
         for it in data.ITEMS:
             cat = it["category"]
@@ -192,8 +216,8 @@ class TBWWorld(World):
             elif cat == "ability":
                 if it.get("retired"):
                     continue  # defined for id stability only; never placed
-                if it.get("baseKit") and it.get("character") == self.start_hero:
-                    continue  # precollected as the start hero's kit
+                if it["name"] in precollected_abilities:
+                    continue  # start hero's kit -- or every kit, when base abilities aren't shuffled
                 pool.append(self.create_item(it["name"]))
             # outfit items are intentionally NOT placed: buying an outfit at the shop is a
             # location check (and grants the cosmetic in-game already), and there is no mechanism
@@ -236,7 +260,7 @@ class TBWWorld(World):
         # Each replaces one Donut; capped by remaining pool space (plenty at every option
         # combo today, but stay safe), distributed round-robin so a cap stays even.
         extra = self.options.extra_confidence_boosts.value
-        headroom = len(data.LOCATIONS) - len(pool)
+        headroom = self._location_count() - len(pool)
         for _ in range(extra):
             for internal in data.PLAYABLE_CHARACTERS:
                 if headroom <= 0 or not data.OUTFIT_TOTAL_COST_PER_CHARACTER[internal]:
@@ -252,8 +276,8 @@ class TBWWorld(World):
         # player reaches everything else through the mission-select board.
 
         # Fill the remainder with generic filler ("Donut"). No location is pre-locked now, so the
-        # pool fills all of them.
-        remainder = len(data.LOCATIONS) - len(pool)
+        # pool fills all of them (all that this seed creates -- optional checks may be left out).
+        remainder = self._location_count() - len(pool)
         for _ in range(remainder):
             pool.append(self.create_item(data.FILLER_ITEM_NAME))
 
@@ -278,7 +302,10 @@ class TBWWorld(World):
             region_by_stage[mission["stageID"]] = region
             menu.connect(region, f"To {mission['name']}", rules.make_mission_rule(player, mission))
 
+        excluded = set(self._excluded_location_keys())
         for loc in data.LOCATIONS:
+            if loc["key"] in excluded:
+                continue  # optional check turned off in the yaml: not created at all
             cat = loc["category"]
             if cat == "outfit_purchase":
                 region = shop
@@ -341,6 +368,8 @@ class TBWWorld(World):
     # read back on a UT regen. death_link isn't logic but rides along for completeness.
     _SLOT_DATA_OPTIONS = (
         "starting_hero",
+        "shuffle_base_abilities",
+        "armoury_caches_goal",
         "confidence_boosts_per_wizard",
         "extra_confidence_boosts",
         "completion_perk_percent",
@@ -393,6 +422,11 @@ class TBWWorld(World):
                 internal: data.confidence_boost_value(internal, n)
                 for internal in data.PLAYABLE_CHARACTERS
             },
+            # Optional checks this seed did NOT create (ids). The mod skips reporting these so
+            # a player who does the deed anyway gets no phantom check / label for it.
+            "excluded_location_ids": [
+                data.LOCATION_BY_KEY[key]["id"] for key in self._excluded_location_keys()
+            ],
             # Convenience extras; the client also learns these via ReceivedItems.
             "start_character": self.start_hero,
             "start_mission": self.start_mission,

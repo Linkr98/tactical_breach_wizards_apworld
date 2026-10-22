@@ -137,6 +137,18 @@ BASE_ABILITY_ITEMS_BY_CHARACTER: Dict[str, List[str]] = {}
 for _it in ITEMS:
     if _it["category"] == "ability" and _it.get("baseKit"):
         BASE_ABILITY_ITEMS_BY_CHARACTER.setdefault(_it["character"], []).append(_it["name"])
+# Every live base-kit ability item (the `shuffle_base_abilities` option decides whether these
+# are shuffled into the pool or handed to the player up front, see __init__.generate_early).
+BASE_ABILITY_ITEM_NAMES: List[str] = [
+    name for names in BASE_ABILITY_ITEMS_BY_CHARACTER.values() for name in names
+]
+
+# Optional checks (yaml toggles). Each is a location KEY the world may simply not create; the
+# mod is told which ones via slot_data ("excluded_location_ids") so it never reports them.
+# Dall's Destroy-the-Caches goal in The B Team's Armoury room is far harder than any other
+# confidence goal (project owner, 2026-09-09) -> off by default via `armoury_caches_goal`.
+ARMOURY_CACHES_GOAL_KEY = "goal:The Broadcast/5 The Armoury.lvl|DestroyCachesByTurnGoal|1"
+assert ARMOURY_CACHES_GOAL_KEY in LOCATION_BY_KEY, ARMOURY_CACHES_GOAL_KEY
 
 
 def recommended_perks_for_stage(stage_id: str) -> int:

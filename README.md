@@ -52,17 +52,24 @@ and edit the **Tactical Breach Wizards** section. Options:
 - `death_link` — optional; off by default. When anyone in the multiworld dies, one of
   your wizards gets a lethal condition they must out-run by finishing the room's
   objectives that turn — and your deaths are shared the same way.
+- `shuffle_base_abilities` — off by default: every wizard has their full base kit as soon
+  as you unlock them, and only the four anxiety-dream ability upgrades are shuffled. Turn on
+  to shuffle the base abilities (Predictive Bolt, Broom Breach, Spectral Skull, ...) into the
+  multiworld too — a new wizard may be missing part of their kit until you find it.
+- `armoury_caches_goal` — off by default: Dall's "Destroy the Caches" goal in The B Team's
+  Armoury room is far harder than any other goal, so it isn't a check unless you turn this on.
 
 ## What is randomized
 
 - **Items found in the multiworld:** the five wizards, access to each campaign mission,
-  14 abilities (each wizard's base kit plus the four special dream abilities), perk
-  points, and per-character Confidence Boosts (the only way to earn confidence to spend
+  the four special dream abilities (plus each wizard's base kit if `shuffle_base_abilities`
+  is on), perk points, and per-character Confidence Boosts (the only way to earn confidence to spend
   at the shop). Cosmetic outfits are not items — buying one at the shop is itself a
   check, and the purchase gives you the outfit as normal.
 - **Checks (locations):** completing each mission, reaching each mission's halfway
   point, each in-mission confidence goal, buying each outfit in the shop, unlocking each
-  dream ability, and recruiting each wizard — 238 in all.
+  dream ability, and recruiting each wizard — 238 in all (237 with the Armoury caches goal
+  left out, the default).
 
 You start with **one random wizard** (with their full base kit and one perk point) and
 **one random early mission**. Everything else is reached through the mod's mission

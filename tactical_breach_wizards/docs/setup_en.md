@@ -28,6 +28,12 @@ and edit the **Tactical Breach Wizards** section. Options:
   needs a perked Rion, not a strong Zan).
 - `starting_hero` — which wizard you start with: `zan`, `jen`, `banks`, `dall`, `rion`,
   or `random` (the default) to let the seed pick.
+- `shuffle_base_abilities` — off by default: every wizard has their full base kit as soon
+  as you unlock them, and only the four anxiety-dream ability upgrades are shuffled. Turn on
+  to shuffle the base abilities (Predictive Bolt, Broom Breach, Spectral Skull, ...) into the
+  multiworld too — a new wizard may be missing part of their kit until you find it.
+- `armoury_caches_goal` — off by default: Dall's "Destroy the Caches" goal in The B Team's
+  Armoury room is far harder than any other goal, so it isn't a check unless you turn this on.
 - `confidence_boosts_per_wizard` — how many "Confidence Boost" items it takes to clear a
   wizard's whole wardrobe (default 5). Each boost's value scales with that wizard's total
   wardrobe cost, so every wizard needs the same number of boosts. Confidence is earned only
@@ -39,13 +45,14 @@ and edit the **Tactical Breach Wizards** section. Options:
 ## What is randomized
 
 - **Items found in the multiworld:** the five wizards, access to each campaign mission,
-  14 abilities (each wizard's base kit plus the four special dream abilities), perk
-  points, and per-character Confidence Boosts (the only way to earn confidence to spend
+  the four special dream abilities (plus each wizard's base kit if `shuffle_base_abilities`
+  is on), perk points, and per-character Confidence Boosts (the only way to earn confidence to spend
   at the shop). Cosmetic outfits are not items — buying one at the shop is itself a
   check, and the purchase gives you the outfit as normal.
 - **Checks (locations):** completing each mission, reaching each mission's halfway
   point, each in-mission confidence goal, buying each outfit in the shop, unlocking each
-  dream ability, and recruiting each wizard — 238 in all.
+  dream ability, and recruiting each wizard — 238 in all (237 with the Armoury caches goal
+  left out, the default).
 
 You start with **one random wizard** (with their full base kit and one perk point) and
 **one random early mission**. Everything else is reached through the mod's mission

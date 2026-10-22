@@ -96,13 +96,23 @@ def check_pool_math():
     # their slots become Donut filler, so they don't appear in `base`. The second mission is a
     # normal shuffled item now (no forced opening lock), so mission_access only drops the 1
     # precollected start mission and no location is pre-locked.
+    # Base-kit abilities: 9 live items (Dall has none); with shuffle_base_abilities OFF (the
+    # default) every one is precollected, ON only the start hero's kit is. Either way they
+    # come out of the pool and Donut fills the gap.
+    assert len(data.BASE_ABILITY_ITEM_NAMES) == 9, data.BASE_ABILITY_ITEM_NAMES
+    assert set(data.BASE_ABILITY_ITEM_NAMES) <= set(data.ABILITY_ITEM_NAMES)
+    biggest_kit = max(len(v) for v in data.BASE_ABILITY_ITEMS_BY_CHARACTER.values())
     base = (
         (sum(1 for it in data.ITEMS if it["category"] == "character") - 1)        # minus start hero
         + (sum(1 for it in data.ITEMS if it["category"] == "mission_access") - 1)  # minus start mission
-        + len(data.ABILITY_ITEM_NAMES)  # live abilities only -- retired ones are never placed
+        + len(data.ABILITY_ITEM_NAMES) - biggest_kit  # live abilities minus (at least) the hero's kit
         + (perk_full - 1)  # perk points minus the 1 precollected on the start hero
     )
-    fillable = n_locations  # nothing pre-locked; the pool fills every location
+    # Optional checks: the Armoury caches goal is a real confidence_goal location that the
+    # default yaml simply doesn't create -> one fewer location to fill.
+    armoury = data.LOCATION_BY_KEY[data.ARMOURY_CACHES_GOAL_KEY]
+    assert armoury["category"] == "confidence_goal" and armoury["character"] == "RiotPriest", armoury
+    fillable = n_locations - 1  # nothing pre-locked; the tightest case (armoury goal off)
     chars_with_wardrobe = sum(1 for c in data.OUTFIT_TOTAL_COST_PER_CHARACTER.values() if c)
     for n in (1, 5, 20):           # confidence_boosts_per_wizard extremes + default
         # Each wizard with a wardrobe gets exactly n boosts; each boost's value scales with
@@ -120,7 +130,8 @@ def check_pool_math():
             filler = fillable - placed
             assert filler >= 0, f"negative filler for n={n}, extra={extra}: {filler}"
             assert placed + filler == fillable
-    print("[ok] pool math: itempool == 238 across confidence_boosts_per_wizard 1..20 x extras 0..10")
+    print("[ok] pool math: itempool fills 237/238 locations across confidence_boosts_per_wizard "
+          "1..20 x extras 0..10, base abilities shuffled or not")
 
 
 def check_perk_gating():
