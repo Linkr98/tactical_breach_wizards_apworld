@@ -20,9 +20,9 @@ In the Archipelago Launcher, generate a template yaml ("Generate Template Option
 and edit the **Tactical Breach Wizards** section. Options:
 
 - `completion_perk_percent` — completing a mission (or reaching its halfway checkpoint)
-  requires this percent of its recommended per-slot perks.
-- `goal_perk_percent` — same idea for confidence goals, defaulting higher. A wizard's perk
-  power counts their perk points + their dream ability, and one strong wizard can be fielded
+  requires this percent of its recommended per-slot perks (default 50, range 25–100).
+- `goal_perk_percent` — same idea for confidence goals (default 60, range 25–100); keep it
+  at or above `completion_perk_percent`. A wizard's perk power counts their perk points + their dream ability, and one strong wizard can be fielded
   in multiple slots, so these check your strongest unlocked wizard — except in anxiety
   dreams, whose squad is scripted: there the gate checks the dream's own cast (Rion's dream
   needs a perked Rion, not a strong Zan).
@@ -35,9 +35,11 @@ and edit the **Tactical Breach Wizards** section. Options:
 - `armoury_caches_goal` — off by default: Dall's "Destroy the Caches" goal in The B Team's
   Armoury room is far harder than any other goal, so it isn't a check unless you turn this on.
 - `confidence_boosts_per_wizard` — how many "Confidence Boost" items it takes to clear a
-  wizard's whole wardrobe (default 5). Each boost's value scales with that wizard's total
+  wizard's whole wardrobe (default 10). Each boost's value scales with that wizard's total
   wardrobe cost, so every wizard needs the same number of boosts. Confidence is earned only
   from these items and is spent at the outfit shop.
+- `extra_confidence_boosts` — spare boosts per wizard on top of that (default 2). Not
+  required by logic; they give slack so one missing boost doesn't hold everything up.
 - `death_link` — optional; off by default. When anyone in the multiworld dies, one of
   your wizards gets a lethal condition they must out-run by finishing the room's
   objectives that turn — and your deaths are shared the same way.

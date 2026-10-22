@@ -1,5 +1,11 @@
 # Tactical Breach Wizards Multiworld Setup Guide
 
+**Version 0.2.0** — tested on Archipelago 0.6.8. Use with the matching 0.2.0 release of
+the [game mod](https://github.com/Linkr98/Tactical-Breach-Wizards-Archipelago-Mod).
+
+> **This project is no longer actively maintained.** It's shared as-is; issues may not
+> get answered. Forks and continuations are welcome.
+
 ## Beta
 
 Logic is currently work in progress. There is a chance that there are unreachable locations in logic and because of that it is possible to get an impossible seed. Using /send_location or 'Skip Level' may be require if you soft lock.
@@ -41,14 +47,20 @@ seeds someone else generated.
 In the Archipelago Launcher, generate a template yaml ("Generate Template Options")
 and edit the **Tactical Breach Wizards** section. Options:
 
-- `completion_perk_percent` — from Act 2 on, completing a mission requires your best wizard
-  to have this percent of its recommended per-slot perks (default 25; 0 disables).
-- `goal_perk_percent` — same idea for confidence goals, also from Act 2 on, defaulting higher
-  (default 50; 0 disables). A wizard's perk power counts their perk points + their dream
-  ability, and one strong wizard can be fielded in multiple slots, so these check your
-  strongest unlocked wizard — keeping you from being underpowered for a late mission.
-- `confidence_per_boost` — how much confidence each "Confidence Boost" item grants
-  (default 5). Confidence is earned only from these items and is spent at the outfit shop.
+- `completion_perk_percent` — completing a mission (or reaching its halfway checkpoint)
+  requires this percent of its recommended per-slot perks (default 50, range 25–100).
+- `goal_perk_percent` — same idea for confidence goals (default 60, range 25–100); keep it
+  at or above `completion_perk_percent`. A wizard's perk power counts their perk points + their dream ability, and one strong wizard can be fielded
+  in multiple slots, so these check your strongest unlocked wizard — except in anxiety
+  dreams, whose squad is scripted: there the gate checks the dream's own cast.
+- `starting_hero` — which wizard you start with: `zan`, `jen`, `banks`, `dall`, `rion`,
+  or `random` (the default) to let the seed pick.
+- `confidence_boosts_per_wizard` — how many "Confidence Boost" items it takes to clear a
+  wizard's whole wardrobe (default 10). Each boost's value scales with that wizard's total
+  wardrobe cost, so every wizard needs the same number of boosts. Confidence is earned only
+  from these items and is spent at the outfit shop.
+- `extra_confidence_boosts` — spare boosts per wizard on top of that (default 2). Not
+  required by logic; they give slack so one missing boost doesn't hold everything up.
 - `death_link` — optional; off by default. When anyone in the multiworld dies, one of
   your wizards gets a lethal condition they must out-run by finishing the room's
   objectives that turn — and your deaths are shared the same way.
